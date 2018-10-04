@@ -1,0 +1,10 @@
+callgrind*
+dht_*
+dht
+
+tags
+
+data/
+
+**/.mypy_cache
+**/__pycache__

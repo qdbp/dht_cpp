@@ -1,0 +1,387 @@
+#include "bdecode.h"
+#include "dht.h"
+#include "gpmap.h"
+#include "log.h"
+#include "msg.h"
+#include "rt.h"
+#include "util.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/random.h>
+#include <uv.h>
+
+#define CHECK(r, msg)                                                          \
+    if (r < 0) {                                                               \
+        fprintf(stderr, "%s: %s\n", msg, uv_strerror(r));                      \
+        exit(1);                                                               \
+    }
+
+#define DEFAULT_QUAL 1
+
+#define N_RECV 1024
+#define N_SEND 1024
+#define MAX_N_SEND (3 * (N_SEND >> 2))
+#define MAX_N_RECV (3 * (N_RECV >> 2))
+
+static char g_recv_buf[N_RECV][BD_MAXLEN] = {{0}};
+static bool g_recv_buf_in_use[N_RECV] = {0};
+static u32 g_recv_buf_num_in_use = 0;
+
+static uv_buf_t g_send_buf[N_SEND][1] = {{{0}}};
+static bool g_send_buf_in_use[N_SEND] = {0};
+static u32 g_send_buf_num_in_use = 0;
+
+static uv_udp_send_t g_request = {0};
+
+static uv_loop_t *main_loop;
+static uv_udp_t g_udp_server;
+static uv_timer_t g_statgather_timer;
+static uv_timer_t g_bootstrap_timer;
+
+static int find_first_unused(const bool flags[], u32 num) {
+    u32 start = randint(0, num);
+    for (u32 ctr = start; ctr < num; ctr++) {
+        if (!flags[ctr]) {
+            return ctr;
+        }
+    }
+    for (u32 ctr = 0; ctr < start; ctr++) {
+        if (!flags[ctr]) {
+            return ctr;
+        }
+    }
+    WARN("Exhausted flag search! This is painful!")
+    return -1;
+};
+
+static const rt_nodeinfo_t g_bootstrap_node = {
+    .nid =
+        {
+            '2',  0xf5, 'N',  'i',  's',  'Q',  0xff, 'J', 0xec, ')',
+            0xcd, 0xba, 0xab, 0xf2, 0xfb, 0xe3, 'F',  '|', 0xc2, 'g',
+        },
+    .in_addr = 183949123,
+    // the "reverse" of 6881
+    .sin_port = 57626,
+};
+
+static void handle_msg(parsed_msg *, const struct sockaddr_in *);
+
+static void cb_send_msg(uv_udp_send_t *req, int status) {
+    if (status < 0) {
+        DEBUG("SEND FAILED!")
+    } else {
+        DEBUG("SENT! FREED SEND BUFFER")
+        g_send_buf_in_use = false;
+    }
+}
+
+static void cb_recv_msg(uv_udp_t *handle, ssize_t nread, const uv_buf_t *rcvbuf,
+                        const struct sockaddr *saddr, unsigned flags) {
+    if (saddr == NULL) {
+        return;
+    }
+
+    if (nread < MIN_MSG_LEN) {
+        st_inc(ST_bm_too_short);
+        return;
+    }
+
+    parsed_msg rcvd = {0};
+    stat_t bd_status = xdecode(rcvbuf->base, nread, &rcvd);
+
+    if (bd_status != ST_bd_a_no_error) {
+        st_inc(bd_status);
+        return;
+    }
+
+    st_inc(ST_rx_tot);
+    handle_msg(&rcvd, (const struct sockaddr_in *)saddr);
+
+    DEBUG("FREED RECV BUFFER")
+    g_recv_buf_in_use = false;
+}
+
+static inline bool send_msg(char *msg, u64 len, const struct sockaddr_in *dest,
+                            stat_t acct) {
+
+    if (g_send_buf_in_use) {
+        DEBUG("SEND BUFFER IN USE! SFYL!")
+        g_send_buf[0].len = 0;
+        return false;
+    }
+
+    g_send_buf[0].base = msg;
+    g_send_buf[0].len = len;
+    g_send_buf_in_use = true;
+
+    // int status =
+    //     uv_udp_try_send(&g_udp_server, send_bufs, 1, (struct sockaddr
+    //     *)dest);
+
+    int status = uv_udp_send(&g_request, &g_udp_server, g_send_buf, 1,
+                             (struct sockaddr *)dest, &cb_send_msg);
+
+#ifdef SEND_TRACE
+    DEBUG("sending %s[%lu] to %08x:%04hx", stat_names[acct], len,
+          be32toh(dest->sin_addr.s_addr), be16toh(dest->sin_port))
+#endif
+
+    if (status >= 0) {
+        st_inc(acct);
+        st_inc(ST_tx_tot);
+        return true;
+    } else {
+        DEBUG("send status: %s", uv_strerror(status))
+        st_inc(ST_tx_msg_drop_overflow);
+        return false;
+    }
+}
+
+inline static void send_to_node(char *msg, u64 len,
+                                const rt_nodeinfo_t *dest_node, stat_t acct) {
+    const struct sockaddr_in dest = AS_SOCKADDR_IN(dest_node);
+    send_msg(msg, len, &dest, acct);
+}
+
+inline static void send_to_pnode(char *msg, u64 len, const char *pnode,
+                                 stat_t acct) {
+    const struct sockaddr_in dest = PNODE_AS_SOCKADDR_IN(pnode);
+    send_msg(msg, len, &dest, acct);
+}
+
+void ping_sweep_nodes(const parsed_msg *krpc_msg) {
+    char ping[MSG_BUF_LEN];
+    u64 len;
+
+    for (int ix = 0; ix < krpc_msg->n_nodes; ix++) {
+        len = msg_q_pg(ping, (krpc_msg->nodes)[ix]);
+        send_to_pnode(ping, len, (krpc_msg->nodes)[ix], ST_tx_q_pg);
+    }
+}
+
+static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
+    char reply[MSG_BUF_LEN] = {0};
+    u64 len = 0;
+
+    rt_nodeinfo_t *node;
+    gpm_next_hop_t next_node = {{0}};
+    u16 gp_tok;
+
+    switch (krpc_msg->method) {
+    case MSG_Q_PG:
+        len = msg_r_pg(reply, krpc_msg);
+        send_msg(reply, len, saddr, ST_tx_r_pg);
+
+        rt_add_sender_as_contact(krpc_msg, saddr, 1);
+        break;
+
+    case MSG_Q_FN:
+
+        node = rt_get_valid_neighbor_contact(krpc_msg->nid);
+        if (node != NULL) {
+            len = msg_r_fn(reply, krpc_msg, node);
+            send_msg(reply, len, saddr, ST_tx_r_fn);
+        }
+
+        rt_add_sender_as_contact(krpc_msg, saddr, 2);
+        break;
+
+    case MSG_Q_GP:
+        st_inc(ST_rx_q_gp);
+
+        // TODO handle ihashes
+        // DEBUG("got gp infohahsh %08lx%08lx%04x",
+        //       be64toh(*(u64 *)(krpc_msg->ih)),
+        //       be64toh(*(u64 *)(krpc_msg->ih + 8)),
+        //       be32toh(*(u32 *)(krpc_msg->ih + 16)))
+
+        // Find our closest contact to the infohash and send a q_gp to them
+
+        if (gpm_decide_pursue_q_gp_ih(&gp_tok, krpc_msg)) {
+
+            node = rt_get_valid_neighbor_contact(krpc_msg->ih);
+
+            if (!node) {
+                break;
+            }
+
+            len = msg_q_gp(reply, node->nid, krpc_msg->ih, gp_tok);
+            send_to_node(reply, len, node, ST_tx_q_gp);
+
+            gpm_register_q_gp_ihash(node->nid, krpc_msg->ih, 0, gp_tok);
+        }
+
+        // reply to the sender node
+        node = rt_get_valid_neighbor_contact(krpc_msg->nid);
+        if (node != NULL) {
+            len = msg_r_fn(reply, krpc_msg, node);
+            send_msg(reply, len, saddr, ST_tx_r_gp);
+        }
+
+        rt_add_sender_as_contact(krpc_msg, saddr, 1);
+        break;
+
+    case MSG_Q_AP:
+        st_inc(ST_rx_q_ap);
+
+        // u16 ap_port;
+        // if (krpc_msg->ap_implied_port) {
+        //     ap_port = saddr->sin_port;
+        // } else {
+        //     ap_port = (u16)krpc_msg->ap_port;
+        // }
+
+        if (krpc_msg->ap_name_len > 0) {
+            if (!is_valid_utf8((unsigned char *)(krpc_msg->ap_name),
+                               krpc_msg->ap_name_len)) {
+                st_inc(ST_bm_ap_bad_name);
+                break;
+            }
+            // TODO handle AP with name
+        }
+
+        // TODO db_update_peers(ih, [compact_peerinfo_bytes(saddr[0],
+        // ap_port)])
+        len = msg_r_pg(reply, krpc_msg);
+        send_msg(reply, len, saddr, ST_tx_r_ap);
+
+        rt_add_sender_as_contact(krpc_msg, saddr, 3);
+        break;
+
+    case MSG_R_FN:
+        st_inc(ST_rx_r_fn);
+        if (krpc_msg->n_nodes == 0) {
+            ERROR("Empty 'nodes' in R_FN")
+            st_inc(ST_err_bd_empty_r_gp);
+            break;
+        }
+        ping_sweep_nodes(krpc_msg);
+        break;
+
+    case MSG_R_GP:
+        st_inc(ST_rx_r_gp);
+
+        if (krpc_msg->n_peers > 0) {
+            INFO("got r_gp peers!")
+            st_inc(ST_rx_r_gp_values);
+            // TODO handle peer
+
+            rt_add_sender_as_contact(krpc_msg, saddr, 4);
+        }
+
+        if (krpc_msg->n_nodes > 0) {
+            st_inc(ST_rx_r_gp_nodes);
+            // TODO handle gp nodes
+            ping_sweep_nodes(krpc_msg);
+
+            if (gpm_extract_r_gp_ih(&next_node, krpc_msg)) {
+                for (int ix = 0; ix < next_node.n_pnodes; ix++) {
+                    if (!get_vacant_tok(&gp_tok)) {
+                        goto end_pnodes_iter;
+                    }
+                    len = msg_q_gp(reply, next_node.pnodes[ix], next_node.ih,
+                                   gp_tok);
+                    send_to_pnode(reply, len, next_node.pnodes[ix], ST_tx_q_gp);
+                    gpm_register_q_gp_ihash(next_node.pnodes[ix], next_node.ih,
+                                            next_node.hop_ctr + 1, gp_tok);
+                    // DEBUG("pursuing ih, hop %d/%d!", next_node.hop_ctr + 1,
+                    // ix)
+                }
+            end_pnodes_iter:;
+            }
+        }
+        break;
+
+    case MSG_R_PG:
+        st_inc(ST_rx_r_pg);
+        rt_add_sender_as_contact(krpc_msg, saddr, 2);
+        break;
+
+    default:
+        ERROR("Unhandled krpc method name %s (%d)",
+              get_method_name(krpc_msg->method), krpc_msg->method)
+        st_inc(ST_err_bd_handle_fallthrough);
+        break;
+    }
+}
+
+static inline void cb_alloc(uv_handle_t *client, size_t suggested_size,
+                            uv_buf_t *buf) {
+
+    // Store the buffer index in the first 4 bytes.
+    if (g_recv_buf_in_use) {
+        DEBUG("RECV BUF IN USE, FOOL!!!")
+        buf->len = 0;
+    }
+    buf->base = g_recv_buf;
+    buf->len = BD_MAXLEN;
+    g_recv_buf_in_use = true;
+}
+
+void init_subsystems(void) {
+    VERBOSE("Initializing rt...")
+    rt_init();
+    VERBOSE("Initializing st...")
+    st_init();
+    INFO("Initialized.")
+}
+
+void loop_statgather_cb(uv_timer_t *timer) {
+    st_rollover();
+    VERBOSE("Rolled over stats.")
+}
+
+void loop_bootstrap_cb(uv_timer_t *timer) {
+    char msg[MSG_BUF_LEN];
+
+    char random_target[NIH_LEN];
+    getrandom(random_target, NIH_LEN, 0);
+
+    u64 len = msg_q_fn(msg, &g_bootstrap_node, random_target);
+
+    send_to_node(msg, len, &g_bootstrap_node, ST_tx_q_fn);
+
+    // VERBOSE("Bootstrapped.")
+}
+
+int main(int argc, char *argv[]) {
+    init_subsystems();
+
+    int status;
+    struct sockaddr_in addr;
+
+    main_loop = uv_default_loop();
+
+    // INITIALIZE UDP SERVER
+    status = uv_udp_init(main_loop, &g_udp_server);
+    CHECK(status, "init");
+
+    uv_ip4_addr("10.11.11.6", 6881, &addr);
+
+    status = uv_udp_bind(&g_udp_server, (const struct sockaddr *)&addr, 0);
+    CHECK(status, "bind");
+
+    status = uv_udp_recv_start(&g_udp_server, cb_alloc, cb_recv_msg);
+    CHECK(status, "recv");
+
+    // INIT statgather
+    status = uv_timer_init(main_loop, &g_statgather_timer);
+    CHECK(status, "statgather timer init");
+    status =
+        uv_timer_start(&g_statgather_timer, &loop_statgather_cb, 6000, 6000);
+    CHECK(status, "statgather start")
+
+    // INIT BOOTSTRAP
+    status = uv_timer_init(main_loop, &g_bootstrap_timer);
+    CHECK(status, "bootstrap timer init");
+    status = uv_timer_start(&g_bootstrap_timer, &loop_bootstrap_cb, 100, 50);
+
+    CHECK(status, "boostrap start")
+
+    // RUN LOOP
+    uv_run(main_loop, UV_RUN_DEFAULT);
+
+    return 0;
+}
