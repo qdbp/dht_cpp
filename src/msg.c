@@ -113,7 +113,7 @@ u64 msg_r_gp(char *restrict buf, const parsed_msg *rcvd, const pnode_t pnode) {
 
     APPEND(buf, offset, "d1:rdl:id20:")
 
-    write_sid(buf, rcvd->nid);
+    write_sid(buf + offset, rcvd->nid);
     offset += NIH_LEN;
 
     APPEND(buf, offset, "5:token1:" OUR_TOKEN "5:nodes26:")
