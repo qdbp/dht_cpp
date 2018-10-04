@@ -377,6 +377,7 @@ void loop_bootstrap_cb(uv_timer_t *timer) {
 }
 
 int main(int argc, char *argv[]) {
+
     init_subsystems();
 
     int status;
@@ -388,7 +389,7 @@ int main(int argc, char *argv[]) {
     status = uv_udp_init(main_loop, &g_udp_server);
     CHECK(status, "init");
 
-    uv_ip4_addr("10.33.1.6", 6881, &addr);
+    uv_ip4_addr("0.0.0.0", 6881, &addr);
 
     status = uv_udp_bind(&g_udp_server, (const struct sockaddr *)&addr, 0);
     CHECK(status, "bind");
