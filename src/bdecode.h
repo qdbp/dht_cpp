@@ -56,14 +56,14 @@ typedef enum bd_meth_t {
 
 typedef struct parsed_msg {
     bd_meth_t method;
-    char nid[NIH_LEN];
-    char ih[NIH_LEN];
+    nih_t nid;
+    nih_t ih;
     char tok[BD_MAXLEN_TOK];
     u32 tok_len;
-    char target[NIH_LEN];
-    char nodes[BD_MAX_NODES][PNODE_LEN];
+    nih_t target;
+    pnode_t nodes[BD_MAX_NODES];
     u32 n_nodes;
-    char peers[BD_MAX_PEERS][PEERINFO_LEN];
+    peerinfo_t peers[BD_MAX_PEERS];
     u32 n_peers;
     char token[BD_MAXLEN_TOKEN];
     u32 token_len;
@@ -84,19 +84,9 @@ typedef struct bd_state {
     bool save_ap_port;
 } bd_state;
 
-typedef void (*bdecode_fn_t)(const char *, u32 *, u32, bd_state *,
-                             parsed_msg *);
-
 stat_t xdecode(const char *, u32, parsed_msg *);
 
 void print_parsed_msg(parsed_msg *);
 const char *get_method_name(bd_meth_t);
-
-// bdecode_fn_t krpc_bdecode_d;
-// bdecode_fn_t krpc_bdecode_e;
-// bdecode_fn_t krpc_bdecode_i;
-// bdecode_fn_t krpc_bdecode_s;
-// bdecode_fn_t krpc_bdecode_fail;
-// bdecode_fn_t krpc_bdecode_l;
 
 #endif // DHT_BDECODE_H

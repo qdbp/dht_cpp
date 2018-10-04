@@ -12,32 +12,15 @@
 #include <sys/types.h>
 
 static rt_nodeinfo_t *g_rt = NULL;
-
 static int g_dkad_offsets[256] = {0};
-static const char _zeros[NIH_LEN] = {0};
 
-inline void unpack_nodeinfo(rt_nodeinfo_t *dst, const char *src) {
-    /*
-     * Unpack a 26-byte DHT nodeinfo string into an rt_nodeinfo_t structure.
-     */
-    memcpy(dst->nid, src, NIH_LEN);
-    memcpy(&(dst->in_addr), src + NIH_LEN, IP_LEN);
-    memcpy(&(dst->sin_port), src + NIH_LEN + IP_LEN, PORT_LEN);
-}
-
-inline void pack_nodeinfo(char *dst, const rt_nodeinfo_t *src) {
-    memcpy(dst, src->nid, NIH_LEN);
-    memcpy(dst + NIH_LEN, &(src->in_addr), IP_LEN);
-    memcpy(dst + NIH_LEN + IP_LEN, &(src->sin_port), PORT_LEN);
-}
-
-inline static bool is_nodeinfo_empty(const rt_nodeinfo_t *nodeinfo) {
-    return (0 == memcmp(nodeinfo->nid, _zeros, NIH_LEN));
+inline bool is_pnode_empty(const pnode_t pnode) {
+    return 0 == *(u64 *)pnode.nid.raw;
 }
 
 inline static bool eq_nodeinfo_nid(const rt_nodeinfo_t *node1,
-                                   const char *other_nid) {
-    return (0 == memcmp(node1->nid, other_nid, NIH_LEN));
+                                   const nih_t other_nid) {
+    return (0 == memcmp(node1->pnode.nid.raw, other_nid.raw, NIH_LEN));
 }
 
 inline bool validate_addr(u32 in_addr, u16 sin_port) {
@@ -69,28 +52,9 @@ inline bool validate_addr(u32 in_addr, u16 sin_port) {
     return true;
 }
 
-inline bool validate_nodeinfo(const rt_nodeinfo_t *nodeinfo) {
-    return (!is_nodeinfo_empty(nodeinfo)) &&
-           validate_addr(nodeinfo->in_addr, nodeinfo->sin_port);
-}
-
-// static inline void write_peerinfo(char *target, u32 in_addr, u16 sin_port) {
-//     // the address and port are stored in network byte order in sockaddr_in
-//     // so the following is safe
-//     char *addr_bytes = (char *)&(in_addr);
-//     char *port_bytes = (char *)&(sin_port);
-//     for (int ix = 0; ix < 4; ix += 1) {
-//         target[ix] = addr_bytes[ix];
-//     }
-//
-//     target[4] = port_bytes[0];
-//     target[5] = port_bytes[1];
-// }
-
-void write_nodeinfo(char *dst, const rt_nodeinfo_t *node) {
-    // relies on contiguous memory layout
-    memcpy(dst, node, NIH_LEN + IP_LEN + PORT_LEN);
-    // write_peerinfo(dst + NIH_LEN, node->in_addr, node->sin_port);
+inline bool validate_pnode(const pnode_t pnode) {
+    return (!is_pnode_empty(pnode)) &&
+           validate_addr(pnode.peerinfo.in_addr, pnode.peerinfo.sin_port);
 }
 
 static void load_rt() {
@@ -124,7 +88,7 @@ static void load_rt() {
     g_rt = (rt_nodeinfo_t *)addr;
 }
 
-inline rt_nodeinfo_t *rt_get_cell(const char *nid) {
+inline rt_nodeinfo_t *rt_get_cell(const nih_t nid) {
     /*
     Returns the index in the routing table corresponding to the given
     nid. Obviously not injective.
@@ -132,9 +96,9 @@ inline rt_nodeinfo_t *rt_get_cell(const char *nid) {
     ASSUMES 8 CONTACTS AT DEPTH 3
     */
     u8 a, b, c;
-    a = nid[0];
-    b = nid[1];
-    c = nid[2];
+    a = nid.raw[0];
+    b = nid.raw[1];
+    c = nid.raw[2];
 
     return rt_get_cell_by_coords(a, b, c);
 }
@@ -143,13 +107,12 @@ inline rt_nodeinfo_t *rt_get_cell_by_coords(u8 a, u8 b, u8 c) {
     return g_rt + ((u32)a << 16) + ((u32)b << 8) + c;
 }
 
-inline static void rt__set_from_addr(rt_nodeinfo_t *cell, const char *nid,
+inline static void rt__set_from_addr(rt_nodeinfo_t *cell, const nih_t nid,
                                      const struct sockaddr_in *addr, u8 qual) {
-    SET_NIH(cell->nid, nid);
+    SET_NIH(cell->pnode.nid.raw, nid.raw);
     // These are all in network byte order
-    cell->sin_port = addr->sin_port;
-    cell->in_addr = addr->sin_addr.s_addr;
-
+    cell->pnode.peerinfo.sin_port = addr->sin_port;
+    cell->pnode.peerinfo.in_addr = addr->sin_addr.s_addr;
     cell->quality = CLIP_Q(qual);
 }
 
@@ -178,7 +141,7 @@ stat_t rt_add_sender_as_contact(const parsed_msg *krpc,
     return ST_rt_replace_accept;
 }
 
-stat_t rt_random_replace_contact(const char *new_pnode, u8 base_qual) {
+stat_t rt_random_replace_contact(const pnode_t new_pnode, u8 base_qual) {
     /*
     Possibly randomly replaces the contact for `new_pnode` in the routing
     table.
@@ -189,16 +152,13 @@ stat_t rt_random_replace_contact(const char *new_pnode, u8 base_qual) {
     If no contact is evicted, the new_contact is simply ignored.
     */
 
-    rt_nodeinfo_t *node_spot = rt_get_cell(new_pnode);
+    rt_nodeinfo_t *node_spot = rt_get_cell(new_pnode.nid);
 
     if (rt_check_evict(node_spot->quality, base_qual)) {
         // Assumes the relevant fields are contiguous in memory
-        if (validate_nodeinfo((rt_nodeinfo_t *)new_pnode)) {
-            memcpy(node_spot->nid, new_pnode, NIH_LEN);
-            memcpy(&(node_spot->in_addr), new_pnode + NIH_LEN, IP_LEN);
-            memcpy(&(node_spot->sin_port), new_pnode + NIH_LEN + IP_LEN,
-                   PORT_LEN);
-            node_spot->quality = base_qual <= RT_MAX_Q ? base_qual : RT_MAX_Q;
+        if (validate_pnode(new_pnode)) {
+            node_spot->pnode = new_pnode;
+            node_spot->quality = CLIP_Q(base_qual);
             return ST_rt_replace_accept;
         } else {
             return ST_rt_replace_invalid;
@@ -224,7 +184,7 @@ bool rt_check_evict(u8 cur_qual, u8 cand_qual) {
     return randint(0, 1 << (cur_qual - cand_qual)) == 0;
 }
 
-void rt_adj_quality(const char *nid, i64 delta) {
+void rt_adj_quality(const nih_t nid, i64 delta) {
     /*
     Adjusts the quality of the routing contact "nid", if it
     can be found. Otherwise, does nothing.
@@ -239,10 +199,10 @@ void rt_adj_quality(const char *nid, i64 delta) {
     }
 
     u8 new_qual = cur_nodeinfo->quality + delta;
-    cur_nodeinfo->quality = new_qual > RT_MAX_Q ? RT_MAX_Q : new_qual;
+    cur_nodeinfo->quality = CLIP_Q(new_qual);
 }
 
-rt_nodeinfo_t *rt_get_valid_neighbor_contact(const char *target) {
+rt_nodeinfo_t *rt_get_valid_neighbor_contact(const nih_t target) {
     /*
     Returns a nid from the array of nids `narr` whose first two bytes
     match the target.
@@ -250,20 +210,20 @@ rt_nodeinfo_t *rt_get_valid_neighbor_contact(const char *target) {
 
     rt_nodeinfo_t *neighbor_cell = rt_get_cell(target);
 
-    if (!is_nodeinfo_empty(neighbor_cell)) {
+    if (!is_pnode_empty(neighbor_cell->pnode)) {
         return neighbor_cell;
     }
 
     rt_nodeinfo_t *alt_cell;
 
     // try one neighbor cell, then fail
-    if (g_dkad_offsets[(int)target[2]] > 0) {
+    if (g_dkad_offsets[(int)target.raw[2]] > 0) {
         alt_cell = neighbor_cell + 1;
     } else {
         alt_cell = neighbor_cell - 1;
     }
 
-    if (!is_nodeinfo_empty(alt_cell)) {
+    if (!is_pnode_empty(alt_cell->pnode)) {
         return alt_cell;
     } else {
         st_inc(ST_rt_miss);
@@ -271,14 +231,14 @@ rt_nodeinfo_t *rt_get_valid_neighbor_contact(const char *target) {
     }
 }
 
-void rt_nuke_node(char *target) {
+void rt_nuke_node(const nih_t target) {
     /*
     A node has been very naughty. It must be annihilated!
     */
 
     rt_nodeinfo_t *cell = rt_get_cell(target);
     // check the node hasn't been replaced in the interim
-    if (0 == memcmp(cell, target, NIH_LEN)) {
+    if (0 == memcmp(cell, target.raw, NIH_LEN)) {
         memset(cell, 0, sizeof(rt_nodeinfo_t));
     }
 }
@@ -291,24 +251,25 @@ rt_nodeinfo_t *rt_get_random_valid_node() {
         find no node at all.
         */
 
-    u64 start_ix = randint(0, RT_TOTAL_CONTACTS);
+    u32 start = randint(0, RT_TOTAL_CONTACTS);
+    u32 end = RT_TOTAL_CONTACTS;
 
-    for (int ix = 0; ix < RT_TOTAL_CONTACTS; ix++) {
-        u64 jx = (start_ix + ix) % RT_TOTAL_CONTACTS;
-        u64 ax = jx >> 16;
-        u64 bx = (jx >> 8) & 0xff;
-        u64 cx = jx & 0xff;
+    while (start > 0) {
+        for (int ix = start; ix < end; ix++) {
+            u8 ax = ix >> 16;
+            u8 bx = (ix >> 8) & 0xff;
+            u8 cx = ix & 0xff;
 
-        rt_nodeinfo_t *out = rt_get_cell_by_coords(ax, bx, cx);
+            rt_nodeinfo_t *out = rt_get_cell_by_coords(ax, bx, cx);
 
-        if (validate_nodeinfo(out)) {
-            return out;
+            if (!is_pnode_empty(out->pnode)) {
+                return out;
+            }
         }
-        // clean up as we go
-        else if (!is_nodeinfo_empty(out)) {
-            memset(out, 0, sizeof(rt_nodeinfo_t));
-        }
+        end = start;
+        start = 0;
     }
+
     st_inc(ST_err_rt_no_contacts);
     ERROR("Could not find any random valid contact. RT in trouble!")
     return NULL;

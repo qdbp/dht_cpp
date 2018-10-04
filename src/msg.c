@@ -53,41 +53,39 @@ const char Q_PG_PROTO[] = "d1:ad2:id20:"
     memcpy(buf + offset, strlit, sizeof(strlit) - 1);                          \
     offset += sizeof(strlit) - 1;
 
-inline void write_sid(char *restrict buf, const char nid[20]) {
-    SET_NIH(buf, nid);
+inline void write_sid(char *restrict buf, const nih_t nid) {
+    SET_NIH(buf, nid.raw);
     for (int ix = 0; ix < 20; ix++) {
         buf[ix] ^= SID_MASK[ix];
     }
 }
 
-u64 msg_q_gp(char *restrict buf, char nid[20], char infohash[20], u16 tok) {
+u64 msg_q_gp(char *restrict buf, nih_t nid, nih_t infohash, u16 tok) {
 
     memcpy(buf, Q_GP_PROTO, Q_GP_LEN);
     write_sid(buf + Q_GP_SID_OFFSET, nid);
-    SET_NIH(buf + Q_GP_IH_OFFSET, infohash);
+    SET_NIH(buf + Q_GP_IH_OFFSET, infohash.raw);
     *(u16 *)(buf + Q_GP_TOK_OFFSET) = tok;
 
     return Q_GP_LEN;
 }
 
-u64 msg_q_fn(char *restrict buf, const rt_nodeinfo_t *dest,
-             const char *target) {
+u64 msg_q_fn(char *restrict buf, const pnode_t dest, const nih_t target) {
     memcpy(buf, Q_FN_PROTO, Q_FN_LEN);
-    SET_NIH(buf + Q_FN_TARGET_OFFSET, target);
-    write_sid(buf + Q_FN_SID_OFFSET, dest->nid);
+    SET_NIH(buf + Q_FN_TARGET_OFFSET, target.raw);
+    write_sid(buf + Q_FN_SID_OFFSET, dest.nid);
 
     return Q_FN_LEN;
 }
 
-u64 msg_q_pg(char *restrict buf, const char *nid) {
+u64 msg_q_pg(char *restrict buf, const nih_t nid) {
     memcpy(buf, Q_PG_PROTO, Q_PG_LEN);
     write_sid(buf + Q_PG_SID_OFFSET, nid);
 
     return Q_PG_LEN;
 }
 
-u64 msg_r_fn(char *restrict buf, const parsed_msg *rcvd,
-             const rt_nodeinfo_t *pnode) {
+u64 msg_r_fn(char *restrict buf, const parsed_msg *rcvd, pnode_t pnode) {
     u64 offset = 0;
 
     APPEND(buf, offset, "d1:rd2:id20:")
@@ -97,7 +95,7 @@ u64 msg_r_fn(char *restrict buf, const parsed_msg *rcvd,
 
     APPEND(buf, offset, "5:nodes26:")
 
-    write_nodeinfo(buf + offset, pnode);
+    SET_PNODE(buf + offset, pnode.raw);
     offset += PNODE_LEN;
 
     APPEND(buf, offset, "e1:t")
@@ -110,8 +108,7 @@ u64 msg_r_fn(char *restrict buf, const parsed_msg *rcvd,
     return offset;
 }
 
-u64 msg_r_gp(char *restrict buf, const parsed_msg *rcvd,
-             const rt_nodeinfo_t *pnode) {
+u64 msg_r_gp(char *restrict buf, const parsed_msg *rcvd, const pnode_t pnode) {
     u64 offset = 0;
 
     APPEND(buf, offset, "d1:rdl:id20:")
@@ -121,7 +118,7 @@ u64 msg_r_gp(char *restrict buf, const parsed_msg *rcvd,
 
     APPEND(buf, offset, "5:token1:" OUR_TOKEN "5:nodes26:")
 
-    write_nodeinfo(buf + offset, pnode);
+    SET_PNODE(buf + offset, pnode.raw);
     offset += PNODE_LEN;
 
     APPEND(buf, offset, "e1:t")

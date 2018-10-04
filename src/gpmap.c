@@ -22,7 +22,7 @@ static u64 now_ms;
 #endif
 
 typedef struct gpm_ih_status {
-    char ih[NIH_LEN];      // The infohash being tracked
+    nih_t ih;              // The infohash being tracked
     u32 last_nid_checksum; // The last peer we contacted
     u64 last_reponse_ms;   // Last time we got a r_gp for this infohash
     bool is_set;           // whether the entry is valid
@@ -30,7 +30,7 @@ typedef struct gpm_ih_status {
 } gpm_ih_status_t;
 
 // Random cells will be assigned from this array
-static gpm_ih_status_t g_ifl_buf[N_BINS] = {{{0}}};
+static gpm_ih_status_t g_ifl_buf[N_BINS] = {{{{0}}}};
 // The number of used cells. If this number equals or exceeds MAX_USED, new
 // cells will be denied. The maximum should be low enough to minimize the
 // probability of pathological iteration, on the same principles as a
@@ -53,8 +53,8 @@ static u16 g_n_bins_used = 0;
 // INTERNAL FUNCTIONS
 //
 
-static inline u32 nih_checksum(const char *nih) {
-    return *(u32 *)(nih + 16);
+static inline u32 nih_checksum(const nih_t nih) {
+    return *(u32 *)(nih.raw + 16);
 }
 
 inline bool get_vacant_tok(u16 *dst) {
@@ -88,13 +88,13 @@ inline bool get_vacant_tok(u16 *dst) {
     return false;
 }
 
-inline static void set_ih_status(u16 tok, const char *nid, const char *ih,
+inline static void set_ih_status(u16 tok, const nih_t nid, const nih_t ih,
                                  u8 hop) {
 
     gpm_ih_status_t *cell = &g_ifl_buf[tok];
 
     cell->last_nid_checksum = nih_checksum(nid);
-    SET_NIH(g_ifl_buf[tok].ih, ih);
+    g_ifl_buf[tok].ih = ih;
 
     UPDATE_NOW_MS()
     cell->last_reponse_ms = now_ms;
@@ -106,35 +106,40 @@ inline static void set_ih_status(u16 tok, const char *nid, const char *ih,
 // Writes up to MAX_GP_PNODES nodes to the next hop structure; could be less,
 // writes the actual number written to the structure.
 inline static void find_best_hops(gpm_next_hop_t *next_hop,
-                                  const parsed_msg *krpc_msg, const char *ih) {
+                                  const parsed_msg *krpc_msg, const nih_t ih) {
     u8 n_pnodes =
         (MAX_GP_PNODES < krpc_msg->n_nodes) ? MAX_GP_PNODES : krpc_msg->n_nodes;
 
     u8 this_dkad;
-    u16 dkxs[MAX_GP_PNODES] = {160};
-    u16 next_dkx;
-    u16 this_dkx;
+    u8 this_ix;
+    u8 next_dkad;
+    u8 next_ix;
+    u8 best_dkads[MAX_GP_PNODES] = {160};
+    u8 best_ixes[MAX_GP_PNODES] = {0};
+
     bool displace = false;
 
     for (u8 ix = 0; ix < krpc_msg->n_nodes; ix += 1) {
-        this_dkad = dkad(ih, krpc_msg->nodes[ix]);
+        this_dkad = dkad(ih, krpc_msg->nodes[ix].nid);
+        this_ix = ix;
         for (u8 jx = 0; jx < MAX_GP_PNODES; jx++) {
-            if (this_dkad < (dkxs[jx] & 0xff)) {
+            if (this_dkad < best_dkads[jx]) {
                 displace = true;
-                this_dkx = ((u16)ix << 8) | this_dkad;
             }
             if (displace) {
-                next_dkx = dkxs[jx];
-                dkxs[jx] = this_dkx;
-                this_dkx = next_dkx;
+                next_dkad = best_dkads[jx];
+                next_ix = best_ixes[jx];
+                best_dkads[jx] = this_dkad;
+                best_ixes[jx] = this_ix;
+                this_ix = next_ix;
+                this_dkad = next_dkad;
             }
         }
         st_click_dkad(this_dkad);
     }
 
     for (int dx = 0; dx < n_pnodes; dx++) {
-        SET_PNODE(next_hop->pnodes[dkxs[dx] >> 8],
-                  krpc_msg->nodes[dkxs[dx] >> 8]);
+        next_hop->pnodes[dx] = krpc_msg->nodes[best_ixes[dx]];
     }
 
     next_hop->n_pnodes = n_pnodes;
@@ -155,7 +160,7 @@ bool gpm_decide_pursue_q_gp_ih(u16 *assign_tok, const parsed_msg *rcvd) {
     }
 }
 
-void gpm_register_q_gp_ihash(const char *nid, const char *ih, u8 hop, u16 tok) {
+void gpm_register_q_gp_ihash(nih_t nid, nih_t ih, u8 hop, u16 tok) {
 
     if (hop > IFL_MAX_HOPS) {
         st_inc(ST_gpm_ih_drop_too_many_hops);
@@ -184,7 +189,7 @@ bool gpm_extract_r_gp_ih(gpm_next_hop_t *restrict next_hop,
     }
 
     // u8 best_node = find_best_hop(krpc_msg, extract->ih);
-    SET_NIH(next_hop->ih, cell->ih)
+    next_hop->ih = cell->ih;
     find_best_hops(next_hop, krpc_msg, cell->ih);
     next_hop->hop_ctr = cell->hop_ctr;
 

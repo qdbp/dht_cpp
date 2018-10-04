@@ -57,14 +57,15 @@ static int find_unused(const bool flags[], u32 num) {
 };
 
 static const rt_nodeinfo_t g_bootstrap_node = {
-    .nid =
-        {
-            '2',  0xf5, 'N',  'i',  's',  'Q',  0xff, 'J', 0xec, ')',
-            0xcd, 0xba, 0xab, 0xf2, 0xfb, 0xe3, 'F',  '|', 0xc2, 'g',
-        },
-    .in_addr = 183949123,
+    .pnode.nid = {.raw =
+                      {
+                          '2',  0xf5, 'N', 'i',  's',  'Q',  0xff,
+                          'J',  0xec, ')', 0xcd, 0xba, 0xab, 0xf2,
+                          0xfb, 0xe3, 'F', '|',  0xc2, 'g',
+                      }},
+    .pnode.peerinfo.in_addr = 183949123,
     // the "reverse" of 6881
-    .sin_port = 57626,
+    .pnode.peerinfo.sin_port = 57626,
 };
 
 static void handle_msg(parsed_msg *, const struct sockaddr_in *);
@@ -177,20 +178,19 @@ static inline bool send_msg(char *msg, u64 len, const struct sockaddr_in *dest,
         return true;
     } else {
         DEBUG("send failed (early): %s", uv_strerror(status))
+        DEBUG("address (be) %x, port (be): %hu", be32toh(dest->sin_addr.s_addr),
+              be16toh(dest->sin_port))
         st_inc(ST_tx_msg_drop_early_error);
         return false;
     }
 }
 
-inline static void send_to_node(char *msg, u64 len,
-                                const rt_nodeinfo_t *dest_node, stat_t acct) {
-    const struct sockaddr_in dest = AS_SOCKADDR_IN(dest_node);
-    send_msg(msg, len, &dest, acct);
-}
-
-inline static void send_to_pnode(char *msg, u64 len, const char *pnode,
+inline static void send_to_pnode(char *msg, u64 len, const pnode_t pnode,
                                  stat_t acct) {
-    const struct sockaddr_in dest = PNODE_AS_SOCKADDR_IN(pnode);
+    const struct sockaddr_in dest = {
+        .sin_port = pnode.peerinfo.sin_port,
+        .sin_addr.s_addr = pnode.peerinfo.in_addr,
+    };
     send_msg(msg, len, &dest, acct);
 }
 
@@ -199,8 +199,8 @@ void ping_sweep_nodes(const parsed_msg *krpc_msg) {
     u64 len;
 
     for (int ix = 0; ix < krpc_msg->n_nodes; ix++) {
-        len = msg_q_pg(ping, (krpc_msg->nodes)[ix]);
-        send_to_pnode(ping, len, (krpc_msg->nodes)[ix], ST_tx_q_pg);
+        len = msg_q_pg(ping, krpc_msg->nodes[ix].nid);
+        send_to_pnode(ping, len, krpc_msg->nodes[ix], ST_tx_q_pg);
     }
 }
 
@@ -209,7 +209,7 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
     u64 len = 0;
 
     rt_nodeinfo_t *node;
-    gpm_next_hop_t next_node = {{0}};
+    gpm_next_hop_t next_node = {{{0}}};
     u16 gp_tok;
 
     switch (krpc_msg->method) {
@@ -224,7 +224,7 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
 
         node = rt_get_valid_neighbor_contact(krpc_msg->nid);
         if (node != NULL) {
-            len = msg_r_fn(reply, krpc_msg, node);
+            len = msg_r_fn(reply, krpc_msg, node->pnode);
             send_msg(reply, len, saddr, ST_tx_r_fn);
         }
 
@@ -234,14 +234,6 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
     case MSG_Q_GP:
         st_inc(ST_rx_q_gp);
 
-        // TODO handle ihashes
-        // DEBUG("got gp infohahsh %08lx%08lx%04x",
-        //       be64toh(*(u64 *)(krpc_msg->ih)),
-        //       be64toh(*(u64 *)(krpc_msg->ih + 8)),
-        //       be32toh(*(u32 *)(krpc_msg->ih + 16)))
-
-        // Find our closest contact to the infohash and send a q_gp to them
-
         if (gpm_decide_pursue_q_gp_ih(&gp_tok, krpc_msg)) {
 
             node = rt_get_valid_neighbor_contact(krpc_msg->ih);
@@ -250,16 +242,15 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
                 break;
             }
 
-            len = msg_q_gp(reply, node->nid, krpc_msg->ih, gp_tok);
-            send_to_node(reply, len, node, ST_tx_q_gp);
-
-            gpm_register_q_gp_ihash(node->nid, krpc_msg->ih, 0, gp_tok);
+            len = msg_q_gp(reply, node->pnode.nid, krpc_msg->ih, gp_tok);
+            send_to_pnode(reply, len, node->pnode, ST_tx_q_gp);
+            gpm_register_q_gp_ihash(node->pnode.nid, krpc_msg->ih, 0, gp_tok);
         }
 
         // reply to the sender node
         node = rt_get_valid_neighbor_contact(krpc_msg->nid);
         if (node != NULL) {
-            len = msg_r_fn(reply, krpc_msg, node);
+            len = msg_r_fn(reply, krpc_msg, node->pnode);
             send_msg(reply, len, saddr, ST_tx_r_gp);
         }
 
@@ -324,11 +315,12 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
                     if (!get_vacant_tok(&gp_tok)) {
                         goto end_pnodes_iter;
                     }
-                    len = msg_q_gp(reply, next_node.pnodes[ix], next_node.ih,
-                                   gp_tok);
+                    len = msg_q_gp(reply, next_node.pnodes[ix].nid,
+                                   next_node.ih, gp_tok);
                     send_to_pnode(reply, len, next_node.pnodes[ix], ST_tx_q_gp);
-                    gpm_register_q_gp_ihash(next_node.pnodes[ix], next_node.ih,
-                                            next_node.hop_ctr + 1, gp_tok);
+                    gpm_register_q_gp_ihash(next_node.pnodes[ix].nid,
+                                            next_node.ih, next_node.hop_ctr + 1,
+                                            gp_tok);
                     // DEBUG("pursuing ih, hop %d/%d!", next_node.hop_ctr + 1,
                     // ix)
                 }
@@ -366,12 +358,11 @@ void loop_statgather_cb(uv_timer_t *timer) {
 void loop_bootstrap_cb(uv_timer_t *timer) {
     char msg[MSG_BUF_LEN];
 
-    char random_target[NIH_LEN];
-    getrandom(random_target, NIH_LEN, 0);
+    nih_t random_target;
+    getrandom(random_target.raw, NIH_LEN, 0);
 
-    u64 len = msg_q_fn(msg, &g_bootstrap_node, random_target);
-
-    send_to_node(msg, len, &g_bootstrap_node, ST_tx_q_fn);
+    u64 len = msg_q_fn(msg, g_bootstrap_node.pnode, random_target);
+    send_to_pnode(msg, len, g_bootstrap_node.pnode, ST_tx_q_fn);
 
     // VERBOSE("Bootstrapped.")
 }

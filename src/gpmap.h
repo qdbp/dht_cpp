@@ -9,8 +9,8 @@
 #include <stdbool.h>
 
 typedef struct gp_next_hop_s {
-    char ih[NIH_LEN];
-    char pnodes[MAX_GP_PNODES][PNODE_LEN];
+    nih_t ih;
+    pnode_t pnodes[MAX_GP_PNODES];
     u8 n_pnodes;
     u8 hop_ctr;
 } gpm_next_hop_t;
@@ -34,8 +34,7 @@ bool gpm_decide_pursue_q_gp_ih(u16 *assign_tok, const parsed_msg *);
 /// control parameters, this might silently drop the infohash - this is the
 /// GPM's concern, and subsequent calls to gpm_extract_r_gp_ih will return
 /// nothing if this happens, ending the pursuit.
-void gpm_register_q_gp_ihash(const char nid[NIH_LEN], const char ih[NIH_LEN],
-                             u8 hop, u16 tok);
+void gpm_register_q_gp_ihash(const nih_t nid, const nih_t ih, u8 hop, u16 tok);
 
 /// Handles an r_gp message, finding the info hash it is associated with.
 /// If the info hash should be pursued, returns true and fills out the passed

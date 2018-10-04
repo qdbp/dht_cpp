@@ -14,8 +14,8 @@
 #define i32 int32_t
 #define i64 int64_t
 
-
-#define MIN_MSG_LEN (sizeof("d1:rd2:id20:mnopqrstuvwxyz123456e1:t0:1:y1:re") - 1)
+#define MIN_MSG_LEN                                                            \
+    (sizeof("d1:rd2:id20:mnopqrstuvwxyz123456e1:t0:1:y1:re") - 1)
 
 // KPRC DEFINITIONS
 #define NIH_LEN 20
@@ -33,11 +33,27 @@
 #define RT_QUAL_FN "./data/rt_qual.dat"
 #define INFO_FILE "./live_info.txt"
 
-#define SET_NIH(dst, src)\
-    memcpy((dst), (src), NIH_LEN);
+typedef struct nih_s {
+    char raw[NIH_LEN];
+} nih_t;
 
-#define SET_PNODE(dst, src)\
-    memcpy((dst), (src), PNODE_LEN);
+typedef union peerinfo_u {
+    char packed[PEERINFO_LEN];
+    struct {
+        u32 in_addr;
+        u16 sin_port;
+    };
+} peerinfo_t;
 
+typedef union pnode_u {
+    char raw[PNODE_LEN];
+    struct {
+        nih_t nid;
+        peerinfo_t peerinfo;
+    };
+} pnode_t;
+
+#define SET_NIH(dst, src) memcpy((dst), (src), NIH_LEN);
+#define SET_PNODE(dst, src) memcpy((dst), (src), PNODE_LEN);
 
 #endif // DHT_DHT_H

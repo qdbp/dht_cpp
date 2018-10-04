@@ -73,17 +73,17 @@ static const u8 g_dkad_tab[256] = {
     8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8};
 
 /// Takes the log kademlia distance between two sha1 hashes.
-inline u8 dkad(const char x[20], const char y[20]) {
+inline u8 dkad(const nih_t x, const nih_t y) {
 
-    u8 d = 160;
+    u8 z, d = 160;
 
     for (int i = 0; i < 20; i++) {
-        u8 xor = x[i] ^ y[i];
-        if (xor == 0) {
+        z = x.raw[i] ^ y.raw[i];
+        if (z == 0) {
             d -= 8;
             continue;
         } else {
-            return d - g_dkad_tab[xor];
+            return d - g_dkad_tab[z];
         }
     }
     return 0;

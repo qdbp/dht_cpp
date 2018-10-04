@@ -509,7 +509,7 @@ inline stat_t xdecode(const char *data, u32 data_len,
                         XD_FAIL(ST_bd_y_bad_length_target)
                     }
                     TRACE("!!! TARGET = ...")
-                    memcpy(out->target, data + start, slen);
+                    SET_NIH(out->target.raw, data + start);
                     continue;
                 case BD_IKEY_NID:
                     if (slen != NIH_LEN) {
@@ -518,14 +518,14 @@ inline stat_t xdecode(const char *data, u32 data_len,
                         XD_FAIL(ST_bd_y_bad_length_nid)
                     }
                     TRACE("!!! NID")
-                    SET_NIH(out->nid, data + start)
+                    SET_NIH(out->nid.raw, data + start)
                     continue;
                 case BD_IKEY_IH:
                     if (slen != NIH_LEN) {
                         XD_FAIL(ST_bd_y_bad_length_ih)
                     }
                     TRACE("!!! IH")
-                    memcpy(out->ih, data + start, slen);
+                    SET_NIH(out->ih.raw, data + start);
                     continue;
                 case BD_IKEY_AP_NAME:
                     if (slen > BD_MAXLEN_AP_NAME) {
@@ -557,7 +557,7 @@ inline stat_t xdecode(const char *data, u32 data_len,
                     XD_FAIL(ST_bd_y_bad_length_peer)
                 }
                 if (out->n_peers < BD_MAX_PEERS) {
-                    memcpy(out->peers[out->n_peers], data + start,
+                    memcpy(out->peers[out->n_peers].packed, data + start,
                            PEERINFO_LEN);
                 }
                 out->n_peers += 1;
@@ -718,10 +718,10 @@ void print_parsed_msg(parsed_msg *out) {
     printf("\tMETH = %s\n", get_method_name(out->method));
 
     printf("\tTOK[%u] = %.*s\n", out->tok_len, (int)out->tok_len, out->tok);
-    printf("\tNID[20] = %.*s\n", NIH_LEN, out->nid);
+    printf("\tNID[20] = %.*s\n", NIH_LEN, out->nid.raw);
 
     if (out->method == MSG_Q_AP) {
-        printf("\t\tMSG_Q_AP -> IH = %.*s\n", NIH_LEN, out->ih);
+        printf("\t\tMSG_Q_AP -> IH = %.*s\n", NIH_LEN, out->ih.raw);
 
         printf("\t\tMSG_Q_AP -> PORT = {%hu} (IP = {%i})\n", out->ap_port,
                out->ap_implied_port);
@@ -730,10 +730,10 @@ void print_parsed_msg(parsed_msg *out) {
                (int)out->token_len, out->token);
 
     } else if (out->method == MSG_Q_GP) {
-        printf("\t\tMSG_Q_GP -> IH = %.*s\n", NIH_LEN, out->ih);
+        printf("\t\tMSG_Q_GP -> IH = %.*s\n", NIH_LEN, out->ih.raw);
 
     } else if (out->method == MSG_Q_FN) {
-        printf("\t\tMSG_Q_FN -> TARGET = %.*s\n", NIH_LEN, out->target);
+        printf("\t\tMSG_Q_FN -> TARGET = %.*s\n", NIH_LEN, out->target.raw);
 
     } else if (out->method == MSG_R_FN) {
         printf("\t\t MSG_R_FN -> NODES[%u] = ...\n", out->n_nodes);
