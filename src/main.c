@@ -188,6 +188,7 @@ static inline bool send_msg(char *msg, u64 len, const struct sockaddr_in *dest,
 inline static void send_to_pnode(char *msg, u64 len, const pnode_t pnode,
                                  stat_t acct) {
     const struct sockaddr_in dest = {
+        .sin_family = AF_INET,
         .sin_port = pnode.peerinfo.sin_port,
         .sin_addr.s_addr = pnode.peerinfo.in_addr,
     };
