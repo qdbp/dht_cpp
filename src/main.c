@@ -22,6 +22,7 @@
 
 #define N_RECV 1024
 #define N_SEND 1024
+#define MSG_SEND_LEN 512
 #define MAX_N_SEND (3 * (N_SEND >> 2))
 #define MAX_N_RECV (3 * (N_RECV >> 2))
 
@@ -30,9 +31,10 @@ static bool g_recv_bufs_in_use[N_RECV] = {0};
 static u32 g_recv_bufs_num_in_use = 0;
 
 static uv_udp_send_t g_requests[N_SEND] = {{0}};
-static uv_buf_t g_send_bufs[N_SEND][1] = {{{0}}};
-static bool g_send_bufs_in_use[N_SEND] = {0};
-static u32 g_send_bufs_num_in_use = 0;
+static uv_buf_t g_send_buf_objs[N_SEND][1] = {{{0}}};
+static char g_send_bufs[N_SEND][MSG_SEND_LEN] = {{0}};
+static bool g_send_buf_objs_in_use[N_SEND] = {0};
+static u32 g_send_buf_objs_num_in_use = 0;
 
 static uv_loop_t *main_loop;
 static uv_udp_t g_udp_server;
@@ -127,8 +129,8 @@ static void cb_send_msg(uv_udp_send_t *req, int status) {
 
     assert(buf_ix < N_SEND);
 
-    g_send_bufs_num_in_use -= 1;
-    g_send_bufs_in_use[buf_ix] = false;
+    g_send_buf_objs_num_in_use -= 1;
+    g_send_buf_objs_in_use[buf_ix] = false;
 
     if (status < 0) {
         DEBUG("send failed (late): %s", uv_strerror(status))
@@ -146,26 +148,28 @@ static inline bool send_msg(char *msg, u64 len, const struct sockaddr_in *dest,
         return false;
     }
 
-    if (g_send_bufs_num_in_use > MAX_N_SEND ||
-        (buf_ix = find_unused(g_send_bufs_in_use, N_SEND)) < 0) {
+    if (g_send_buf_objs_num_in_use > MAX_N_SEND ||
+        (buf_ix = find_unused(g_send_buf_objs_in_use, N_SEND)) < 0) {
 
         DEBUG("no free send buffers!")
         st_inc(ST_tx_msg_drop_overflow);
         return false;
     }
 
-    g_send_bufs_in_use[buf_ix] = true;
-    g_send_bufs_num_in_use += 1;
-    st_set(ST_ctl_n_send_bufs, g_send_bufs_num_in_use);
+    g_send_buf_objs_in_use[buf_ix] = true;
+    g_send_buf_objs_num_in_use += 1;
+    st_set(ST_ctl_n_send_bufs, g_send_buf_objs_num_in_use);
 
     g_requests[buf_ix].data = (void *)(size_t)buf_ix;
 
-    g_send_bufs[buf_ix]->base = msg;
-    g_send_bufs[buf_ix]->len = len;
+    assert(len <= MSG_SEND_LEN);
+    memcpy(g_send_bufs[buf_ix], msg, len);
+    g_send_buf_objs[buf_ix]->base = g_send_bufs[buf_ix];
+    g_send_buf_objs[buf_ix]->len = len;
 
     int status =
-        uv_udp_send(&g_requests[buf_ix], &g_udp_server, g_send_bufs[buf_ix], 1,
-                    (struct sockaddr *)dest, &cb_send_msg);
+        uv_udp_send(&g_requests[buf_ix], &g_udp_server, g_send_buf_objs[buf_ix],
+                    1, (struct sockaddr *)dest, &cb_send_msg);
 
 #ifdef SEND_TRACE
     DEBUG("sending %s[%lu] to %08x:%04hx", stat_names[acct], len,
@@ -178,8 +182,6 @@ static inline bool send_msg(char *msg, u64 len, const struct sockaddr_in *dest,
         return true;
     } else {
         DEBUG("send failed (early): %s", uv_strerror(status))
-        DEBUG("address (be) %x, port (be): %hu", be32toh(dest->sin_addr.s_addr),
-              be16toh(dest->sin_port))
         st_inc(ST_tx_msg_drop_early_error);
         return false;
     }
@@ -196,6 +198,7 @@ inline static void send_to_pnode(char *msg, u64 len, const pnode_t pnode,
 }
 
 void ping_sweep_nodes(const parsed_msg *krpc_msg) {
+
     char ping[MSG_BUF_LEN];
     u64 len;
 

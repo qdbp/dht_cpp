@@ -1,5 +1,7 @@
 #include "dht.h"
+#include "log.h"
 #include "msg.h"
+#include <assert.h>
 #include <uv.h>
 
 static const char SID_MASK[20] = "\0\0\0SUBMITTOTHESCRAPE";
@@ -49,18 +51,24 @@ const char Q_PG_PROTO[] = "d1:ad2:id20:"
 #define Q_PG_LEN (sizeof(Q_PG_PROTO) - 1)
 #define Q_PG_SID_OFFSET 12
 
+#define R_SID_OFFSET 12
+
 #define APPEND(buf, offset, strlit)                                            \
     memcpy(buf + offset, strlit, sizeof(strlit) - 1);                          \
     offset += sizeof(strlit) - 1;
 
-inline void write_sid(char *restrict buf, const nih_t nid) {
-    SET_NIH(buf, nid.raw);
-    for (int ix = 0; ix < 20; ix++) {
+inline static void write_sid_raw(char *restrict buf) {
+    for (int ix = 0; ix < NIH_LEN; ix++) {
         buf[ix] ^= SID_MASK[ix];
     }
 }
 
-u64 msg_q_gp(char *restrict buf, nih_t nid, nih_t infohash, u16 tok) {
+inline void write_sid(char *restrict buf, const nih_t nid) {
+    SET_NIH(buf, nid.raw);
+    write_sid_raw(buf);
+}
+
+u32 msg_q_gp(char *restrict buf, nih_t nid, nih_t infohash, u16 tok) {
 
     memcpy(buf, Q_GP_PROTO, Q_GP_LEN);
     write_sid(buf + Q_GP_SID_OFFSET, nid);
@@ -70,7 +78,7 @@ u64 msg_q_gp(char *restrict buf, nih_t nid, nih_t infohash, u16 tok) {
     return Q_GP_LEN;
 }
 
-u64 msg_q_fn(char *restrict buf, const pnode_t dest, const nih_t target) {
+u32 msg_q_fn(char *restrict buf, const pnode_t dest, const nih_t target) {
     memcpy(buf, Q_FN_PROTO, Q_FN_LEN);
     SET_NIH(buf + Q_FN_TARGET_OFFSET, target.raw);
     write_sid(buf + Q_FN_SID_OFFSET, dest.nid);
@@ -78,73 +86,38 @@ u64 msg_q_fn(char *restrict buf, const pnode_t dest, const nih_t target) {
     return Q_FN_LEN;
 }
 
-u64 msg_q_pg(char *restrict buf, const nih_t nid) {
+u32 msg_q_pg(char *restrict buf, const nih_t nid) {
     memcpy(buf, Q_PG_PROTO, Q_PG_LEN);
     write_sid(buf + Q_PG_SID_OFFSET, nid);
 
     return Q_PG_LEN;
 }
 
-u64 msg_r_fn(char *restrict buf, const parsed_msg *rcvd, pnode_t pnode) {
-    u64 offset = 0;
+u32 msg_r_fn(char *restrict buf, const parsed_msg *rcvd, pnode_t pnode) {
+    u32 len = sprintf(buf, "d1:rd2:id20:%.*s5:nodes26:%.*se1:t%u:%.*s1:y1:re",
+                      20, rcvd->nid.raw, 26, pnode.raw, rcvd->tok_len,
+                      rcvd->tok_len, rcvd->tok);
 
-    APPEND(buf, offset, "d1:rd2:id20:")
-
-    write_sid(buf + offset, rcvd->nid);
-    offset += NIH_LEN;
-
-    APPEND(buf, offset, "5:nodes26:")
-
-    SET_PNODE(buf + offset, pnode.raw);
-    offset += PNODE_LEN;
-
-    APPEND(buf, offset, "e1:t")
-
-    memcpy(buf + offset, rcvd->tok, rcvd->tok_len);
-    offset += rcvd->tok_len;
-
-    APPEND(buf, offset, "1:y1:re")
-
-    return offset;
+    write_sid_raw(buf + R_SID_OFFSET);
+    return len;
 }
 
-u64 msg_r_gp(char *restrict buf, const parsed_msg *rcvd, const pnode_t pnode) {
-    u64 offset = 0;
+u32 msg_r_gp(char *restrict buf, const parsed_msg *rcvd, const pnode_t pnode) {
+    u32 len = sprintf(buf,
+                      "d1:rd2:id20:%.*s5:token1:" OUR_TOKEN
+                      "5:nodes26:%.*se1:t%u:%.*s1:y1:re",
+                      20, rcvd->nid.raw, 26, pnode.raw, rcvd->tok_len,
+                      rcvd->tok_len, rcvd->tok);
 
-    APPEND(buf, offset, "d1:rdl:id20:")
-
-    write_sid(buf + offset, rcvd->nid);
-    offset += NIH_LEN;
-
-    APPEND(buf, offset, "5:token1:" OUR_TOKEN "5:nodes26:")
-
-    SET_PNODE(buf + offset, pnode.raw);
-    offset += PNODE_LEN;
-
-    APPEND(buf, offset, "e1:t")
-
-    memcpy(buf + offset, rcvd->tok, rcvd->tok_len);
-    offset += rcvd->tok_len;
-
-    APPEND(buf, offset, "1:y1:re")
-
-    return offset;
+    write_sid_raw(buf + R_SID_OFFSET);
+    return len;
 }
 
-u64 msg_r_pg(char *restrict buf, const parsed_msg *rcvd) {
-    u64 offset = 0;
+u32 msg_r_pg(char *restrict buf, const parsed_msg *rcvd) {
+    u32 len = sprintf(buf, "d1:rd2:id20:%.*se1:t%u:%.*s1:y1:re", 20,
+                      rcvd->nid.raw, rcvd->tok_len, rcvd->tok_len, rcvd->tok);
 
-    APPEND(offset, buf, "d1:rd2:id20:")
+    write_sid_raw(buf + R_SID_OFFSET);
 
-    write_sid(buf + offset, rcvd->nid);
-    offset += NIH_LEN;
-
-    APPEND(offset, buf, "e1:t")
-
-    memcpy(buf + offset, rcvd->tok, rcvd->tok_len);
-    offset += rcvd->tok_len;
-
-    APPEND(buf, offset, "1:y1:re");
-
-    return offset;
+    return len;
 }

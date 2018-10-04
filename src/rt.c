@@ -14,7 +14,7 @@
 static rt_nodeinfo_t *g_rt = NULL;
 static int g_dkad_offsets[256] = {0};
 
-inline bool is_pnode_empty(const pnode_t pnode) {
+inline static bool is_pnode_empty(const pnode_t pnode) {
     return 0 == *(u64 *)pnode.nid.raw;
 }
 
@@ -52,7 +52,7 @@ inline bool validate_addr(u32 in_addr, u16 sin_port) {
     return true;
 }
 
-inline bool validate_pnode(const pnode_t pnode) {
+inline static bool validate_pnode(const pnode_t pnode) {
     return (!is_pnode_empty(pnode)) &&
            validate_addr(pnode.peerinfo.in_addr, pnode.peerinfo.sin_port);
 }
