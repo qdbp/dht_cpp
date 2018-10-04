@@ -5,6 +5,7 @@
 #include "msg.h"
 #include "rt.h"
 #include "util.h"
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,22 +25,22 @@
 #define MAX_N_SEND (3 * (N_SEND >> 2))
 #define MAX_N_RECV (3 * (N_RECV >> 2))
 
-static char g_recv_buf[N_RECV][BD_MAXLEN] = {{0}};
-static bool g_recv_buf_in_use[N_RECV] = {0};
-static u32 g_recv_buf_num_in_use = 0;
+static char g_recv_bufs[N_RECV][BD_MAXLEN + sizeof(u32)] = {{0}};
+static bool g_recv_bufs_in_use[N_RECV] = {0};
+static u32 g_recv_bufs_num_in_use = 0;
 
-static uv_buf_t g_send_buf[N_SEND][1] = {{{0}}};
-static bool g_send_buf_in_use[N_SEND] = {0};
-static u32 g_send_buf_num_in_use = 0;
-
-static uv_udp_send_t g_request = {0};
+static uv_udp_send_t g_requests[N_SEND] = {{0}};
+static uv_buf_t g_send_bufs[N_SEND][1] = {{{0}}};
+static bool g_send_bufs_in_use[N_SEND] = {0};
+static u32 g_send_bufs_num_in_use = 0;
 
 static uv_loop_t *main_loop;
 static uv_udp_t g_udp_server;
 static uv_timer_t g_statgather_timer;
 static uv_timer_t g_bootstrap_timer;
 
-static int find_first_unused(const bool flags[], u32 num) {
+static int find_unused(const bool flags[], u32 num) {
+
     u32 start = randint(0, num);
     for (u32 ctr = start; ctr < num; ctr++) {
         if (!flags[ctr]) {
@@ -68,17 +69,36 @@ static const rt_nodeinfo_t g_bootstrap_node = {
 
 static void handle_msg(parsed_msg *, const struct sockaddr_in *);
 
-static void cb_send_msg(uv_udp_send_t *req, int status) {
-    if (status < 0) {
-        DEBUG("SEND FAILED!")
-    } else {
-        DEBUG("SENT! FREED SEND BUFFER")
-        g_send_buf_in_use = false;
+static inline void cb_alloc(uv_handle_t *client, size_t suggested_size,
+                            uv_buf_t *buf) {
+
+    int buf_ix;
+
+    if ((g_recv_bufs_num_in_use > MAX_N_SEND) ||
+        (buf_ix = find_unused(g_recv_bufs_in_use, N_RECV)) < 0) {
+        DEBUG("no free recv buffers!")
+        buf->len = 0;
+        return;
     }
+
+    g_recv_bufs_num_in_use++;
+    g_recv_bufs_in_use[buf_ix] = true;
+    st_set(ST_ctl_n_recv_bufs, g_recv_bufs_num_in_use);
+
+    buf->base = g_recv_bufs[buf_ix] + sizeof(u32);
+    buf->len = BD_MAXLEN;
+
+    *(u32 *)(g_recv_bufs[buf_ix]) = (u32)buf_ix;
 }
 
 static void cb_recv_msg(uv_udp_t *handle, ssize_t nread, const uv_buf_t *rcvbuf,
                         const struct sockaddr *saddr, unsigned flags) {
+
+    u32 buf_ix = *(u32 *)((u64)rcvbuf->base - sizeof(u32));
+
+    g_recv_bufs_num_in_use--;
+    g_recv_bufs_in_use[buf_ix] = false;
+
     if (saddr == NULL) {
         return;
     }
@@ -98,30 +118,53 @@ static void cb_recv_msg(uv_udp_t *handle, ssize_t nread, const uv_buf_t *rcvbuf,
 
     st_inc(ST_rx_tot);
     handle_msg(&rcvd, (const struct sockaddr_in *)saddr);
+}
 
-    DEBUG("FREED RECV BUFFER")
-    g_recv_buf_in_use = false;
+static void cb_send_msg(uv_udp_send_t *req, int status) {
+
+    u32 buf_ix = (u64)req->data;
+
+    assert(buf_ix < N_SEND);
+
+    g_send_bufs_num_in_use -= 1;
+    g_send_bufs_in_use[buf_ix] = false;
+
+    if (status < 0) {
+        DEBUG("send failed (late): %s", uv_strerror(status))
+        st_inc(ST_tx_msg_drop_late_error);
+    }
 }
 
 static inline bool send_msg(char *msg, u64 len, const struct sockaddr_in *dest,
                             stat_t acct) {
 
-    if (g_send_buf_in_use) {
-        DEBUG("SEND BUFFER IN USE! SFYL!")
-        g_send_buf[0].len = 0;
+    int buf_ix;
+
+    if (!validate_addr(dest->sin_addr.s_addr, dest->sin_port)) {
+        st_inc(ST_tx_msg_drop_bad_addr);
         return false;
     }
 
-    g_send_buf[0].base = msg;
-    g_send_buf[0].len = len;
-    g_send_buf_in_use = true;
+    if (g_send_bufs_num_in_use > MAX_N_SEND ||
+        (buf_ix = find_unused(g_send_bufs_in_use, N_SEND)) < 0) {
 
-    // int status =
-    //     uv_udp_try_send(&g_udp_server, send_bufs, 1, (struct sockaddr
-    //     *)dest);
+        DEBUG("no free send buffers!")
+        st_inc(ST_tx_msg_drop_overflow);
+        return false;
+    }
 
-    int status = uv_udp_send(&g_request, &g_udp_server, g_send_buf, 1,
-                             (struct sockaddr *)dest, &cb_send_msg);
+    g_send_bufs_in_use[buf_ix] = true;
+    g_send_bufs_num_in_use += 1;
+    st_set(ST_ctl_n_send_bufs, g_send_bufs_num_in_use);
+
+    g_requests[buf_ix].data = (void *)(size_t)buf_ix;
+
+    g_send_bufs[buf_ix]->base = msg;
+    g_send_bufs[buf_ix]->len = len;
+
+    int status =
+        uv_udp_send(&g_requests[buf_ix], &g_udp_server, g_send_bufs[buf_ix], 1,
+                    (struct sockaddr *)dest, &cb_send_msg);
 
 #ifdef SEND_TRACE
     DEBUG("sending %s[%lu] to %08x:%04hx", stat_names[acct], len,
@@ -133,8 +176,8 @@ static inline bool send_msg(char *msg, u64 len, const struct sockaddr_in *dest,
         st_inc(ST_tx_tot);
         return true;
     } else {
-        DEBUG("send status: %s", uv_strerror(status))
-        st_inc(ST_tx_msg_drop_overflow);
+        DEBUG("send failed (early): %s", uv_strerror(status))
+        st_inc(ST_tx_msg_drop_early_error);
         return false;
     }
 }
@@ -307,19 +350,6 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
     }
 }
 
-static inline void cb_alloc(uv_handle_t *client, size_t suggested_size,
-                            uv_buf_t *buf) {
-
-    // Store the buffer index in the first 4 bytes.
-    if (g_recv_buf_in_use) {
-        DEBUG("RECV BUF IN USE, FOOL!!!")
-        buf->len = 0;
-    }
-    buf->base = g_recv_buf;
-    buf->len = BD_MAXLEN;
-    g_recv_buf_in_use = true;
-}
-
 void init_subsystems(void) {
     VERBOSE("Initializing rt...")
     rt_init();
@@ -358,7 +388,7 @@ int main(int argc, char *argv[]) {
     status = uv_udp_init(main_loop, &g_udp_server);
     CHECK(status, "init");
 
-    uv_ip4_addr("10.11.11.6", 6881, &addr);
+    uv_ip4_addr("10.33.1.6", 6881, &addr);
 
     status = uv_udp_bind(&g_udp_server, (const struct sockaddr *)&addr, 0);
     CHECK(status, "bind");
@@ -381,6 +411,7 @@ int main(int argc, char *argv[]) {
     CHECK(status, "boostrap start")
 
     // RUN LOOP
+    INFO("Starting loop.")
     uv_run(main_loop, UV_RUN_DEFAULT);
 
     return 0;

@@ -41,6 +41,8 @@ inline static bool eq_nodeinfo_nid(const rt_nodeinfo_t *node1,
 }
 
 inline bool validate_addr(u32 in_addr, u16 sin_port) {
+
+    // in_addr and sin_port are big_endian
     char *addr_bytes = (char *)&in_addr;
     unsigned char a = addr_bytes[0];
     unsigned char b = addr_bytes[1];

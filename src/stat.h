@@ -13,6 +13,9 @@
 
 #define FORSTAT(X)                                                             \
     X(_ST_ENUM_START)                                                          \
+    /* control variable */                                                     \
+    X(ctl_n_recv_bufs)                                                         \
+    X(ctl_n_send_bufs)                                                         \
     /* received message statistics */                                          \
     X(rx_tot)                                                                  \
     X(rx_oserr)                                                                \
@@ -31,6 +34,9 @@
     X(tx_tot)                                                                  \
     X(tx_exc)                                                                  \
     X(tx_msg_drop_overflow)                                                    \
+    X(tx_msg_drop_early_error)                                                 \
+    X(tx_msg_drop_late_error)                                                  \
+    X(tx_msg_drop_bad_addr)                                                    \
     X(tx_q_ap)                                                                 \
     X(tx_q_fn)                                                                 \
     X(tx_q_pg)                                                                 \
@@ -123,6 +129,7 @@ extern const char *stat_names[];
 void st_inc(stat_t);
 void st_inc_debug(stat_t);
 void st_add(stat_t, u32);
+void st_set(stat_t, u64);
 void st_click_dkad(u8);
 void st_init(void);
 void st_rollover(void);
