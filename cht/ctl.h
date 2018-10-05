@@ -2,7 +2,9 @@
 #ifndef DHT_CTL_H
 #define DHT_CTL_H
 
+#ifndef CTL_PPS_TARGET
 #define CTL_PPS_TARGET 1000.0
+#endif
 
 #include "bdecode.h"
 #include "dht.h"

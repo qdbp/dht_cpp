@@ -27,6 +27,7 @@
     X(ctl_n_recv_bufs)                                                         \
     X(ctl_n_send_bufs)                                                         \
     X(ctl_n_gpm_bufs)                                                          \
+    X(ctl_ping_thresh)                                                         \
     /* received message statistics */                                          \
     X(rx_tot)                                                                  \
     X(rx_oserr)                                                                \
