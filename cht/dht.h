@@ -16,7 +16,7 @@
 #define i64 int64_t
 
 #define MIN_MSG_LEN                                                            \
-    (sizeof("d1:rd2:id20:mnopqrstuvwxyz123456e1:t0:1:y1:re") - 1)
+    (sizeof("d1:rd2:id20:12345123451234512345e1:t0:1:y1:re") - 1)
 
 // KPRC DEFINITIONS
 #define NIH_LEN 20
