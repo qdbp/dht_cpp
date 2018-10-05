@@ -136,7 +136,6 @@ static void cb_send_msg(uv_udp_send_t *req, int status) {
     g_send_buf_objs_in_use[buf_ix] = false;
 
     if (status < 0) {
-        DEBUG("send failed (late): %s", uv_strerror(status))
         st_inc(ST_tx_msg_drop_late_error);
     }
 }
