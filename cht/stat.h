@@ -3,6 +3,7 @@
 #define DHT_STAT_C
 
 #include "dht.h"
+#include <time.h>
 
 #ifndef STAT_CSV_FN
 #define STAT_CSV_FN "./data/stat.csv"
@@ -10,6 +11,14 @@
 
 #ifndef STAT_CSV_FN
 #define STAT_DKAD_FN "./data/dkad.csv"
+#endif
+
+#ifndef STAT_ROLLOVER_FREQ_MS
+#define STAT_ROLLOVER_FREQ_MS 1000
+#endif
+
+#ifndef STAT_CSV_EVERY
+#define STAT_CSV_EVERY 5
 #endif
 
 #define FORSTAT(X)                                                             \
@@ -133,7 +142,14 @@ void st_inc_debug(stat_t);
 void st_add(stat_t, u32);
 void st_set(stat_t, u64);
 void st_click_dkad(u8);
+
+u64 st_get(stat_t);
+u64 st_get_old(stat_t);
+
 void st_init(void);
 void st_rollover(void);
+
+extern u64 st_now_ms;
+extern u64 st_old_ms;
 
 #endif // DHT_STAT_C

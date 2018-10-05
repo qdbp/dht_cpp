@@ -1,4 +1,5 @@
 #include "bdecode.h"
+#include "ctl.h"
 #include "dht.h"
 #include "gpmap.h"
 #include "log.h"
@@ -197,6 +198,9 @@ void ping_sweep_nodes(const parsed_msg *krpc_msg) {
     u32 len;
 
     for (int ix = 0; ix < krpc_msg->n_nodes; ix++) {
+        if (!ctl_decide_ping(krpc_msg->nodes[ix].nid)) {
+            continue;
+        }
         len = msg_q_pg(ping, krpc_msg->nodes[ix].nid);
         send_to_pnode(ping, len, krpc_msg->nodes[ix], ST_tx_q_pg);
     }
@@ -295,10 +299,8 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
         st_inc(ST_rx_r_gp);
 
         if (krpc_msg->n_peers > 0) {
-            INFO("got r_gp peers!")
             st_inc(ST_rx_r_gp_values);
             // TODO handle peer
-
             rt_insert_contact(krpc_msg, saddr, 4);
         }
 
@@ -386,13 +388,14 @@ int main(int argc, char *argv[]) {
     status = uv_timer_init(main_loop, &g_statgather_timer);
     CHECK(status, "statgather timer init");
     //     status =
-    uv_timer_start(&g_statgather_timer, &loop_statgather_cb, 6000, 6000);
+    uv_timer_start(&g_statgather_timer, &loop_statgather_cb,
+                   STAT_ROLLOVER_FREQ_MS, STAT_ROLLOVER_FREQ_MS);
     CHECK(status, "statgather start")
 
     // INIT BOOTSTRAP
     status = uv_timer_init(main_loop, &g_bootstrap_timer);
     CHECK(status, "bootstrap timer init");
-    status = uv_timer_start(&g_bootstrap_timer, &loop_bootstrap_cb, 100, 50);
+    status = uv_timer_start(&g_bootstrap_timer, &loop_bootstrap_cb, 100, 100);
 
     CHECK(status, "boostrap start")
 

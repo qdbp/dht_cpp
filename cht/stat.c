@@ -1,3 +1,4 @@
+#include "ctl.h"
 #include "dht.h"
 #include "log.h"
 #include "stat.h"
@@ -19,12 +20,22 @@ const char *stat_names[] = {FORSTAT(AS_STR)};
     }
 
 static u64 g_ctr[ST__ST_ENUM_END] = {0};
+static u64 g_ctr_old[ST__ST_ENUM_END] = {0};
+u64 st_now_ms = 0;
+u64 st_old_ms = 0;
+
+struct timespec __st_now = {0};
+#define ROLLOVER_TIME()                                                        \
+    clock_gettime(CLOCK_MONOTONIC_COARSE, &__st_now);                          \
+    st_old_ms = st_now_ms;                                                     \
+    st_now_ms = (__st_now.tv_sec * 1000) + (__st_now.tv_nsec / 1000000);
 
 #ifdef STAT_DKAD
 static u64 g_dkad_ctr[161] = {0};
 #endif
 
 void st_init() {
+    ROLLOVER_TIME()
 #ifdef STAT_CSV
     WITH_FILE(csv, STAT_CSV_FN, "w") {
 
@@ -62,7 +73,31 @@ inline void st_click_dkad(u8 dkad) {
 #endif
 };
 
+inline u64 st_get(stat_t stat) {
+    return g_ctr[stat];
+}
+
+inline u64 st_get_old(stat_t stat) {
+    return g_ctr_old[stat];
+}
+
 void st_rollover(void) {
+    static int write_csv = 0;
+
+    ROLLOVER_TIME()
+    ctl_rollover_hook();
+    for (int ix = 0; ix < ST__ST_ENUM_END; ix++) {
+        g_ctr_old[ix] = g_ctr[ix];
+    };
+
+    if (write_csv != STAT_CSV_EVERY - 1) {
+        write_csv++;
+        return;
+    }
+
+    write_csv = 0;
+    DEBUG("Writing CSV")
+
 #ifdef STAT_CSV
     WITH_FILE(csv, STAT_CSV_FN, "a") {
 
