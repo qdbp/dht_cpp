@@ -38,6 +38,8 @@ static gpm_ih_status_t g_ifl_buf[N_BINS] = {{{{0}}}};
 static u16 g_n_bins_used = 0;
 
 #define SET_CELL(cell)                                                         \
+    UPDATE_NOW_MS()                                                            \
+    (cell)->last_reponse_ms = now_ms;                                          \
     if (!((cell)->is_set)) {                                                   \
         (cell)->is_set = true;                                                 \
         g_n_bins_used++;                                                       \
@@ -54,10 +56,6 @@ static u16 g_n_bins_used = 0;
 //
 // INTERNAL FUNCTIONS
 //
-
-static inline u32 nih_checksum(const nih_t nih) {
-    return *(u32 *)(nih.raw + 16);
-}
 
 inline bool get_vacant_tok(u16 *dst) {
 
@@ -95,11 +93,8 @@ static inline void set_ih_status(u16 tok, const nih_t nid, const nih_t ih,
 
     gpm_ih_status_t *cell = &g_ifl_buf[tok];
 
-    cell->last_nid_checksum = nih_checksum(nid);
+    cell->last_nid_checksum = nid.checksum;
     cell->ih = ih;
-
-    UPDATE_NOW_MS()
-    cell->last_reponse_ms = now_ms;
     cell->hop_ctr = hop;
 
     SET_CELL(cell)
@@ -196,7 +191,7 @@ bool gpm_extract_r_gp_ih(gpm_next_hop_t *restrict next_hop,
     if (!cell->is_set) {
         st_inc(ST_gpm_r_gp_lookup_empty);
         return false;
-    } else if (cell->last_nid_checksum != nih_checksum(krpc_msg->nid)) {
+    } else if (cell->last_nid_checksum != krpc_msg->nid.checksum) {
         st_inc(ST_gpm_r_gp_bad_checksum);
         return false;
     }

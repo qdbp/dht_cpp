@@ -34,25 +34,41 @@
 #define RT_QUAL_FN "./data/rt_qual.dat"
 #define INFO_FILE "./live_info.txt"
 
-typedef struct nih_s {
+typedef union nih_u {
     char raw[NIH_LEN];
+    struct {
+        char a;
+        char b;
+        char c;
+        char _[7];
+        char ctl_byte;
+        char __[5];
+        u32 checksum;
+    };
 } nih_t;
+
+_Static_assert(sizeof(nih_t) == NIH_LEN, "Messed up nih_t layout!");
 
 typedef union peerinfo_u {
     char packed[PEERINFO_LEN];
-    struct {
+    struct __attribute__((packed)) {
         u32 in_addr;
         u16 sin_port;
     };
 } peerinfo_t;
 
+_Static_assert(sizeof(peerinfo_t) == PEERINFO_LEN,
+               "Messed up peerinfo_t layout!");
+
 typedef union pnode_u {
     char raw[PNODE_LEN];
-    struct {
+    struct __attribute__((packed)) {
         nih_t nid;
         peerinfo_t peerinfo;
     };
 } pnode_t;
+
+_Static_assert(sizeof(pnode_t) == PNODE_LEN, "Messed up peerinfo_t layout!");
 
 #define SET_NIH(dst, src) memcpy((dst), (src), NIH_LEN);
 #define SET_PNODE(dst, src) memcpy((dst), (src), PNODE_LEN);

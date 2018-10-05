@@ -69,7 +69,7 @@ static inline bool rt_check_evict(u8 cur_qual, u8 cand_qual) {
 }
 
 static inline bool is_pnode_empty(const pnode_t pnode) {
-    return 0 == *(u64 *)pnode.nid.raw;
+    return pnode.nid.checksum != 0;
 }
 
 static inline bool eq_nodeinfo_nid(const rt_nodeinfo_t *node, const nih_t nid) {
@@ -122,13 +122,10 @@ static inline rt_nodeinfo_t *rt_get_cell(const nih_t nid) {
 
     ASSUMES 8 CONTACTS AT DEPTH 3
     */
-    u8 a = nid.raw[0];
-    u8 b = nid.raw[1];
 #ifdef RT_BIG
-    u8 c = nid.raw[2];
-    return rt_get_cell_by_coords(a, b, c);
+    return rt_get_cell_by_coords(nid.a, nid.b, nid.c);
 #endif
-    return rt_get_cell_by_coords(a, b);
+    return rt_get_cell_by_coords(nid.a, nid.b);
 }
 
 static inline void rt__set_from_addr(rt_nodeinfo_t *cell, const nih_t nid,
