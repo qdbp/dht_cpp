@@ -18,6 +18,8 @@ typedef struct rt_nodeinfo_t {
     // 5 bytes FREE
 } rt_nodeinfo_t;
 
+_Static_assert(sizeof(rt_nodeinfo_t) == 32, "Bad nodeinfo size");
+
 #define AS_SOCKADDR_IN(node_ptr)                                               \
     {                                                                          \
         .sin_family = AF_INET, .sin_port = (node_ptr)->sin_port,               \

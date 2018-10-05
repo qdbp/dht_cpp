@@ -26,20 +26,35 @@
 #define MAX_N_SEND (3 * (N_SEND >> 2))
 #define MAX_N_RECV (3 * (N_RECV >> 2))
 
+// RECEIVE BUFFER MANAGEMENT
 static char g_recv_bufs[N_RECV][BD_MAXLEN + sizeof(u32)] = {{0}};
 static bool g_recv_bufs_in_use[N_RECV] = {0};
 static u32 g_recv_bufs_num_in_use = 0;
 
+// SEND BUFFER MANAGEMENT
 static uv_udp_send_t g_requests[N_SEND] = {{0}};
 static uv_buf_t g_send_buf_objs[N_SEND][1] = {{{0}}};
 static char g_send_bufs[N_SEND][MSG_SEND_LEN] = {{0}};
 static bool g_send_buf_objs_in_use[N_SEND] = {0};
 static u32 g_send_buf_objs_num_in_use = 0;
 
+// UV HANDLES
 static uv_loop_t *main_loop;
 static uv_udp_t g_udp_server;
 static uv_timer_t g_statgather_timer;
 static uv_timer_t g_bootstrap_timer;
+
+static const rt_nodeinfo_t g_bootstrap_node = {
+    .pnode.nid = {.raw =
+                      {
+                          '2',  0xf5, 'N', 'i',  's',  'Q',  0xff,
+                          'J',  0xec, ')', 0xcd, 0xba, 0xab, 0xf2,
+                          0xfb, 0xe3, 'F', '|',  0xc2, 'g',
+                      }},
+    .pnode.peerinfo.in_addr = 183949123,
+    // the "reverse" of 6881
+    .pnode.peerinfo.sin_port = 57626,
+};
 
 static int find_unused(const bool flags[], u32 num) {
 
@@ -56,18 +71,6 @@ static int find_unused(const bool flags[], u32 num) {
     }
     WARN("Exhausted flag search! This is painful!")
     return -1;
-};
-
-static const rt_nodeinfo_t g_bootstrap_node = {
-    .pnode.nid = {.raw =
-                      {
-                          '2',  0xf5, 'N', 'i',  's',  'Q',  0xff,
-                          'J',  0xec, ')', 0xcd, 0xba, 0xab, 0xf2,
-                          0xfb, 0xe3, 'F', '|',  0xc2, 'g',
-                      }},
-    .pnode.peerinfo.in_addr = 183949123,
-    // the "reverse" of 6881
-    .pnode.peerinfo.sin_port = 57626,
 };
 
 static void handle_msg(parsed_msg *, const struct sockaddr_in *);
@@ -138,7 +141,7 @@ static void cb_send_msg(uv_udp_send_t *req, int status) {
     }
 }
 
-static inline bool send_msg(char *msg, u64 len, const struct sockaddr_in *dest,
+static inline bool send_msg(char *msg, u32 len, const struct sockaddr_in *dest,
                             stat_t acct) {
 
     int buf_ix;
@@ -187,7 +190,7 @@ static inline bool send_msg(char *msg, u64 len, const struct sockaddr_in *dest,
     }
 }
 
-inline static void send_to_pnode(char *msg, u64 len, const pnode_t pnode,
+inline static void send_to_pnode(char *msg, u32 len, const pnode_t pnode,
                                  stat_t acct) {
     const struct sockaddr_in dest = {
         .sin_family = AF_INET,
@@ -200,7 +203,7 @@ inline static void send_to_pnode(char *msg, u64 len, const pnode_t pnode,
 void ping_sweep_nodes(const parsed_msg *krpc_msg) {
 
     char ping[MSG_BUF_LEN];
-    u64 len;
+    u32 len;
 
     for (int ix = 0; ix < krpc_msg->n_nodes; ix++) {
         len = msg_q_pg(ping, krpc_msg->nodes[ix].nid);
@@ -210,7 +213,7 @@ void ping_sweep_nodes(const parsed_msg *krpc_msg) {
 
 static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
     char reply[MSG_BUF_LEN] = {0};
-    u64 len = 0;
+    u32 len = 0;
 
     rt_nodeinfo_t *node;
     gpm_next_hop_t next_node = {{{0}}};
@@ -355,12 +358,13 @@ void loop_statgather_cb(uv_timer_t *timer) {
 }
 
 void loop_bootstrap_cb(uv_timer_t *timer) {
-    char msg[MSG_BUF_LEN];
 
+    char msg[MSG_BUF_LEN];
     nih_t random_target;
+
     getrandom(random_target.raw, NIH_LEN, 0);
 
-    u64 len = msg_q_fn(msg, g_bootstrap_node.pnode, random_target);
+    u32 len = msg_q_fn(msg, g_bootstrap_node.pnode, random_target);
     send_to_pnode(msg, len, g_bootstrap_node.pnode, ST_tx_q_fn);
 
     // VERBOSE("Bootstrapped.")
