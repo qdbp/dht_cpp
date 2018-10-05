@@ -10,10 +10,10 @@ static u64 now_ms;
 
 #define UPDATE_NOW_MS()                                                        \
     clock_gettime(CLOCK_MONOTONIC, &__NOW_MS_now);                             \
-    now_ms = __NOW_MS_now.tv_nsec / 1000000;
+    now_ms = __NOW_MS_now.tv_nsec >> 20; /* ms ...ish */
 
 #define N_BINS (1 << 16)
-#define MAX_USED (3 << 14)
+#define MAX_USED (7 * (N_BINS >> 3))
 
 #define IFL_BIN_SIZE 64
 #define IFL_EXPIRE_MS 200
@@ -41,12 +41,14 @@ static u16 g_n_bins_used = 0;
     if (!((cell)->is_set)) {                                                   \
         (cell)->is_set = true;                                                 \
         g_n_bins_used++;                                                       \
+        st_set(ST_ctl_n_gpm_bufs, g_n_bins_used);                              \
     }
 
 #define UNSET_CELL(cell)                                                       \
     if ((cell)->is_set) {                                                      \
         (cell)->is_set = false;                                                \
         g_n_bins_used--;                                                       \
+        st_set(ST_ctl_n_gpm_bufs, g_n_bins_used);                              \
     }
 
 //
@@ -72,7 +74,7 @@ inline bool get_vacant_tok(u16 *dst) {
     for (int ctr = 0; ctr < N_BINS; ctr++) {
         cell = &g_ifl_buf[ix];
 
-        if (now_ms - cell->last_reponse_ms > IFL_EXPIRE_MS) {
+        if (cell->is_set && (now_ms - cell->last_reponse_ms > IFL_EXPIRE_MS)) {
             UNSET_CELL(cell)
             *dst = ix;
             return true;
@@ -84,7 +86,7 @@ inline bool get_vacant_tok(u16 *dst) {
         // faster...
         ix++;
     }
-    WARN("Iterated every cell! This is too much pressure!");
+    WARN("Iterated every cell! Did you set MAX_USED correctly?");
     return false;
 }
 
@@ -94,7 +96,7 @@ static inline void set_ih_status(u16 tok, const nih_t nid, const nih_t ih,
     gpm_ih_status_t *cell = &g_ifl_buf[tok];
 
     cell->last_nid_checksum = nih_checksum(nid);
-    g_ifl_buf[tok].ih = ih;
+    cell->ih = ih;
 
     UPDATE_NOW_MS()
     cell->last_reponse_ms = now_ms;
