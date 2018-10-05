@@ -24,14 +24,10 @@ static u64 g_ctr[ST__ST_ENUM_END] = {0};
 static u64 g_dkad_ctr[161] = {0};
 #endif
 
-static u64 time_old = 0;
-static u64 time_now = 0;
-
 void st_init() {
-    time_now = (u64)time(0);
-    time_old = (u64)time(0);
 #ifdef STAT_CSV
     WITH_FILE(csv, STAT_CSV_FN, "w") {
+
         fprintf(csv, "time,");
         for (int ix = 1; ix < ST__ST_ENUM_END - 1; ix++) {
             fprintf(csv, "%s,", stat_names[ix]);
@@ -67,11 +63,10 @@ inline void st_click_dkad(u8 dkad) {
 };
 
 void st_rollover(void) {
-    time_now = (u64)time(0);
 #ifdef STAT_CSV
     WITH_FILE(csv, STAT_CSV_FN, "a") {
 
-        fprintf(csv, "%lu,", (unsigned long)time(0));
+        fprintf(csv, "%lu,", (u64)time(0));
         for (int ix = 1; ix < ST__ST_ENUM_END - 1; ix++) {
             fprintf(csv, "%lu,", g_ctr[ix]);
         }
