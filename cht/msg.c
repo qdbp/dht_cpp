@@ -138,7 +138,7 @@ u32 msg_r_fn(char *restrict buf, const parsed_msg *krpc, const pnode_t pnode) {
 
     u32 offset = R_FN_BASE_LEN;
     offset += write_tok(buf + offset, krpc);
-    offset += sprintf(buf + offset, R_EPILOGUE);
+    memcpy(buf + offset, R_EPILOGUE, R_EPILOGUE_LEN);
     return offset;
 }
 
@@ -149,7 +149,7 @@ u32 msg_r_gp(char *restrict buf, const parsed_msg *krpc, const pnode_t pnode) {
 
     u32 offset = R_GP_BASE_LEN;
     offset += write_tok(buf + offset, krpc);
-    offset += sprintf(buf + offset, R_EPILOGUE);
+    memcpy(buf + offset, R_EPILOGUE, R_EPILOGUE_LEN);
     return offset;
 }
 
@@ -159,6 +159,6 @@ u32 msg_r_pg(char *restrict buf, const parsed_msg *krpc) {
 
     u32 offset = R_PG_BASE_LEN;
     offset += write_tok(buf + offset, krpc);
-    offset += sprintf(buf + offset, R_EPILOGUE);
+    memcpy(buf + offset, R_EPILOGUE, R_EPILOGUE_LEN);
     return offset;
 }
