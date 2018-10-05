@@ -186,7 +186,6 @@ inline stat_t xdecode(const char *data, u32 data_len,
             case XD_START:
             case XD_OVAL:
             case XD_IVAL:
-                DEBUG("EOM at %u (%c) in %.*s", ix, data[ix], data_len, data);
                 XD_FAIL(ST_bd_x_bad_eom);
             }
         case 'i':
