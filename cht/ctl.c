@@ -16,15 +16,11 @@ void ctl_rollover_hook(void) {
     double ping_rate = RATE(ST_tx_q_pg);
     u64 cur_thresh = st_get(ST_ctl_ping_thresh);
 
-    DEBUG("ping rate = %f", ping_rate)
-    DEBUG("ping diff = %lu", DIFF(ST_tx_q_pg))
-
     u8 delta = cur_thresh > 230 ? 1 : 5;
     if (ping_rate < CTL_PPS_TARGET) {
         cur_thresh -= delta;
     } else {
         cur_thresh += delta;
-        DEBUG("Set ping thresh to %d", cur_thresh);
     }
     st_set(ST_ctl_ping_thresh, cur_thresh < 0 ? 0 : cur_thresh);
 }
