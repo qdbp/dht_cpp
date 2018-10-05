@@ -6,6 +6,18 @@
 
 const char *stat_names[] = {FORSTAT(AS_STR)};
 
+#define WITH_FILE(f, fn, mode)                                                 \
+    FILE *f = fopen((fn), (mode));                                             \
+    if (f) {
+
+#define ENDWITH(f, errmsg)                                                     \
+    fflush(f);                                                                 \
+    fclose(f);                                                                 \
+    }                                                                          \
+    else {                                                                     \
+        fprintf(stderr, "%s: %s", (errmsg), strerror(errno));                  \
+    }
+
 static u64 g_ctr[ST__ST_ENUM_END] = {0};
 
 #ifdef STAT_DKAD
@@ -19,18 +31,14 @@ void st_init() {
     time_now = (u64)time(0);
     time_old = (u64)time(0);
 #ifdef STAT_CSV
-    FILE *csv = fopen(STAT_CSV_FN, "w");
-    if (csv != NULL) {
+    WITH_FILE(csv, STAT_CSV_FN, "w") {
         fprintf(csv, "time,");
         for (int ix = 1; ix < ST__ST_ENUM_END - 1; ix++) {
             fprintf(csv, "%s,", stat_names[ix]);
         }
         fprintf(csv, "\n");
-        fflush(csv);
-    } else {
-        WARN("Could not open CSV " STAT_CSV_FN " for writing: %s",
-             strerror(errno));
     }
+    ENDWITH(csv, "Could not open CSV " STAT_CSV_FN " for writing")
 #endif
 }
 
@@ -61,21 +69,18 @@ inline void st_click_dkad(u8 dkad) {
 void st_rollover(void) {
     time_now = (u64)time(0);
 #ifdef STAT_CSV
-    FILE *csv = fopen(STAT_CSV_FN, "a");
-    if (csv != NULL) {
+    WITH_FILE(csv, STAT_CSV_FN, "a") {
+
         fprintf(csv, "%lu,", (unsigned long)time(0));
         for (int ix = 1; ix < ST__ST_ENUM_END - 1; ix++) {
             fprintf(csv, "%lu,", g_ctr[ix]);
         }
         fprintf(csv, "\n");
-        fflush(csv);
-    } else {
-        WARN("Could not open CSV " STAT_CSV_FN " for appending: %s",
-             strerror(errno));
     }
+    ENDWITH(csv, "Could not open " STAT_CSV_FN " for appending")
 #ifdef STAT_DKAD
-    csv = fopen(STAT_DKAD_FN, "w");
-    if (csv != NULL) {
+    WITH_FILE(csv, STAT_DKAD_FN, "w") {
+
         for (int ix = 0; ix <= 160; ix++) {
             fprintf(csv, "%d,", ix);
         }
@@ -83,11 +88,8 @@ void st_rollover(void) {
         for (int ix = 0; ix <= 160; ix++) {
             fprintf(csv, "%d,", g_dkad_ctr[ix]);
         }
-        fflush(csv);
-    } else {
-        WARN("Could not open CSV " STAT_CSV_FN " for appending: %s",
-             strerror(errno));
     }
+    ENDWITH(csv, "Could not open CSV " STAT_DKAD_FN " for writing")
 #endif // STAT_DKAD
 #endif // STAT_CSV
 }
