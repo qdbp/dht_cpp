@@ -1,3 +1,4 @@
+// vi:ft=c
 #ifndef DHT_GPM_H
 #define DHT_GPM_H
 

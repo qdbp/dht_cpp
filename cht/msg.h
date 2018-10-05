@@ -1,3 +1,4 @@
+// vi:ft=c
 #ifndef DHT_MSG_H
 #define DHT_MSG_H
 
