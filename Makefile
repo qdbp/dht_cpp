@@ -5,6 +5,7 @@ FAST = -march=native -Ofast -flto # -finline-functions
 CFLAGS = -DLOGLEVEL=1 -DSTAT_CSV -Wall -Werror -luv
 CPPFLAGS = -DLOGLEVEL=1 -DSTAT_CSV -Wall -Werror -luv
 
+.PHONY: rtdump
 
 build:
 	$(CC) $(CFLAGS) $(FAST) cht/*.c -o dht_fast
@@ -26,3 +27,6 @@ trace_bd: build_tbd
 
 build_tbd:
 	$(GCC) $(CFLAGS) cht/*.c -DBD_TRACE -o dht_trace
+
+rtdump: rtdump/main.c
+	$(GCC) $(CFLAGS) $(FAST) rtdump/main.c -o rtd
