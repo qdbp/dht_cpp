@@ -10,6 +10,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 static rt_nodeinfo_t *g_rt = NULL;
 static int g_dkad_offsets[256] = {0};
@@ -58,24 +59,28 @@ inline static bool validate_pnode(const pnode_t pnode) {
 }
 
 static void load_rt() {
-    int fd = open(RT_FN, O_RDWR);
+    int fd = open(RT_FN, O_RDWR | O_CREAT);
+
     if (fd == -1) {
         ERROR("Could not open rt file, bailing.");
         exit(-1);
     }
 
     struct stat info = {0};
-    if (0 != fstat(fd, &info)) {
-        ERROR("Could not stat rt file, bailing.")
+    if (fstat(fd, &info)) {
+        ERROR("Could not stat rt file: %s, bailing.", strerror(errno))
         exit(-1);
     }
 
     u64 want_size = RT_TOTAL_CONTACTS * sizeof(rt_nodeinfo_t);
 
     if (info.st_size != want_size) {
-        ERROR("Bad size (%ld) rt file found.", info.st_size);
-        ERROR("If upgrading to a new rt format, you must migrate it manually")
-        exit(-1);
+        WARN("Bad size (%ld) rt file found.", info.st_size)
+        WARN("Will be truncating this file!")
+        if (ftruncate(fd, want_size)) {
+            ERROR("Could not truncate file: %s, bailing", strerror(errno))
+            exit(-1);
+        }
     }
 
     void *addr =
@@ -88,6 +93,16 @@ static void load_rt() {
     g_rt = (rt_nodeinfo_t *)addr;
 }
 
+#ifdef RT_BIG
+static inline rt_nodeinfo_t *rt_get_cell_by_coords(u8 a, u8 b, u8 c) {
+    return g_rt + ((u32)a << 16) + ((u32)b << 8) + c;
+}
+#else
+static inline rt_nodeinfo_t *rt_get_cell_by_coords(u8 a, u8 b) {
+    return g_rt + ((u32)a << 8) + b;
+}
+#endif
+
 inline rt_nodeinfo_t *rt_get_cell(const nih_t nid) {
     /*
     Returns the index in the routing table corresponding to the given
@@ -95,33 +110,23 @@ inline rt_nodeinfo_t *rt_get_cell(const nih_t nid) {
 
     ASSUMES 8 CONTACTS AT DEPTH 3
     */
-    u8 a, b, c;
-    a = nid.raw[0];
-    b = nid.raw[1];
-    c = nid.raw[2];
-
+    u8 a = nid.raw[0];
+    u8 b = nid.raw[1];
+#ifdef RT_BIG
+    u8 c = nid.raw[2];
     return rt_get_cell_by_coords(a, b, c);
-}
-
-inline rt_nodeinfo_t *rt_get_cell_by_coords(u8 a, u8 b, u8 c) {
-    return g_rt + ((u32)a << 16) + ((u32)b << 8) + c;
+#endif
+    return rt_get_cell_by_coords(a, b);
 }
 
 inline static void rt__set_from_addr(rt_nodeinfo_t *cell, const nih_t nid,
                                      const struct sockaddr_in *addr, u8 qual) {
-    SET_NIH(cell->pnode.nid.raw, nid.raw);
+    cell->pnode.nid = nid;
     // These are all in network byte order
     cell->pnode.peerinfo.sin_port = addr->sin_port;
     cell->pnode.peerinfo.in_addr = addr->sin_addr.s_addr;
     cell->quality = CLIP_Q(qual);
 }
-
-// inline static void rt__set_from_pnode(rt_nodeinfo_t *cell, const char *pnode,
-//                                       u8 qual) {
-//     // Relies on no weird padding!
-//     SET_PNODE(cell->nid, pnode);
-//     cell->quality = CLIP_Q(qual);
-// }
 
 stat_t rt_add_sender_as_contact(const parsed_msg *krpc,
                                 const struct sockaddr_in *addr, u8 base_qual) {
@@ -256,12 +261,16 @@ rt_nodeinfo_t *rt_get_random_valid_node() {
 
     while (start > 0) {
         for (int ix = start; ix < end; ix++) {
+#ifdef RT_BIG
             u8 ax = ix >> 16;
             u8 bx = (ix >> 8) & 0xff;
             u8 cx = ix & 0xff;
-
             rt_nodeinfo_t *out = rt_get_cell_by_coords(ax, bx, cx);
-
+#else
+            u8 ax = ix >> 8;
+            u8 bx = ix & 0xff;
+            rt_nodeinfo_t *out = rt_get_cell_by_coords(ax, bx);
+#endif
             if (!is_pnode_empty(out->pnode)) {
                 return out;
             }

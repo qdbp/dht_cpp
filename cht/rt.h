@@ -6,7 +6,17 @@
 #include <netinet/ip.h>
 #include <stdbool.h>
 
+/// If this is set, the routing table is half a GiB, which is very
+/// cache-unfriendly This can be considered experimental (even though it was the
+/// first to be used).
+#ifdef RT_BIG
 #define RT_TOTAL_CONTACTS (256 * 256 * 256)
+#define RT_FN "./data/rt3.dat"
+#else
+#define RT_TOTAL_CONTACTS (256 * 256)
+#define RT_FN "./data/rt.dat"
+#endif
+
 #define RT_Q_WIDTH 3
 #define RT_MAX_Q                                                               \
     ((1 << RT_Q_WIDTH) - 1) // check quality bitwidth in rt_nodeinfo_t
@@ -44,7 +54,7 @@ stat_t rt_add_sender_as_contact(const parsed_msg *, const struct sockaddr_in *,
 
 rt_nodeinfo_t *rt_get_valid_neighbor_contact(const nih_t nid);
 rt_nodeinfo_t *rt_get_cell(const nih_t nid);
-rt_nodeinfo_t *rt_get_cell_by_coords(u8, u8, u8);
+// rt_nodeinfo_t *rt_get_cell_by_coords(u8, u8, u8);
 
 void rt_adj_quality(const nih_t, i64);
 bool rt_check_evict(u8, u8);
