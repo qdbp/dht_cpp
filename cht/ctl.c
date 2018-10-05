@@ -24,7 +24,7 @@ void ctl_rollover_hook(void) {
         cur_thresh -= delta;
     } else {
         cur_thresh += delta;
-        DEBUG("Set ping thresh to %d", g_ctl_ping_thresh);
+        DEBUG("Set ping thresh to %d", cur_thresh);
     }
     st_set(ST_ctl_ping_thresh, cur_thresh < 0 ? 0 : cur_thresh);
 }
