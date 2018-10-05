@@ -15,48 +15,7 @@
 static rt_nodeinfo_t *g_rt = NULL;
 static int g_dkad_offsets[256] = {0};
 
-inline static bool is_pnode_empty(const pnode_t pnode) {
-    return 0 == *(u64 *)pnode.nid.raw;
-}
-
-inline static bool eq_nodeinfo_nid(const rt_nodeinfo_t *node1,
-                                   const nih_t other_nid) {
-    return (0 == memcmp(node1->pnode.nid.raw, other_nid.raw, NIH_LEN));
-}
-
-inline bool validate_addr(u32 in_addr, u16 sin_port) {
-
-    // in_addr and sin_port are big_endian
-    char *addr_bytes = (char *)&in_addr;
-    unsigned char a = addr_bytes[0];
-    unsigned char b = addr_bytes[1];
-    unsigned char c = addr_bytes[2];
-    unsigned char d = addr_bytes[3];
-
-    if (be16toh(sin_port) <= 1024) {
-        return false;
-    }
-
-    if (((a & 0xf0) == 240) || (a == 0) || (a == 10) || (a == 127) ||
-        (a == 100 && (b & 0xc0) == 64) || (a == 172 && (b & 0xf0) == 16) ||
-        (a == 198 && (b & 0xfe) == 18) || (a == 169 && b == 254) ||
-        (a == 192 && b == 168) || (a == 192 && b == 0 && c == 0) ||
-        (a == 192 && b == 0 && c == 2) || (a == 192 && b == 31 && c == 196) ||
-        (a == 192 && b == 51 && c == 100) ||
-        (a == 192 && b == 52 && c == 193) ||
-        (a == 192 && b == 175 && c == 48) ||
-        (a == 198 && b == 51 && c == 100) || (a == 203 && b == 0 && c == 113) ||
-        (a == 255 && b == 255 && c == 255 && d == 255)) {
-        return false;
-    }
-
-    return true;
-}
-
-inline static bool validate_pnode(const pnode_t pnode) {
-    return (!is_pnode_empty(pnode)) &&
-           validate_addr(pnode.peerinfo.in_addr, pnode.peerinfo.sin_port);
-}
+// STATIC FUNCTIONS
 
 static void load_rt() {
     int fd = open(RT_FN, O_RDWR | O_CREAT);
@@ -93,87 +52,7 @@ static void load_rt() {
     g_rt = (rt_nodeinfo_t *)addr;
 }
 
-#ifdef RT_BIG
-static inline rt_nodeinfo_t *rt_get_cell_by_coords(u8 a, u8 b, u8 c) {
-    return g_rt + ((u32)a << 16) + ((u32)b << 8) + c;
-}
-#else
-static inline rt_nodeinfo_t *rt_get_cell_by_coords(u8 a, u8 b) {
-    return g_rt + ((u32)a << 8) + b;
-}
-#endif
-
-inline rt_nodeinfo_t *rt_get_cell(const nih_t nid) {
-    /*
-    Returns the index in the routing table corresponding to the given
-    nid. Obviously not injective.
-
-    ASSUMES 8 CONTACTS AT DEPTH 3
-    */
-    u8 a = nid.raw[0];
-    u8 b = nid.raw[1];
-#ifdef RT_BIG
-    u8 c = nid.raw[2];
-    return rt_get_cell_by_coords(a, b, c);
-#endif
-    return rt_get_cell_by_coords(a, b);
-}
-
-inline static void rt__set_from_addr(rt_nodeinfo_t *cell, const nih_t nid,
-                                     const struct sockaddr_in *addr, u8 qual) {
-    cell->pnode.nid = nid;
-    // These are all in network byte order
-    cell->pnode.peerinfo.sin_port = addr->sin_port;
-    cell->pnode.peerinfo.in_addr = addr->sin_addr.s_addr;
-    cell->quality = CLIP_Q(qual);
-}
-
-stat_t rt_add_sender_as_contact(const parsed_msg *krpc,
-                                const struct sockaddr_in *addr, u8 base_qual) {
-
-    if (!validate_addr(addr->sin_addr.s_addr, addr->sin_port)) {
-        st_inc(ST_rt_replace_invalid);
-        return ST_rt_replace_invalid;
-    }
-
-    rt_nodeinfo_t *node_spot = rt_get_cell(krpc->nid);
-
-    if (!rt_check_evict(node_spot->quality, base_qual)) {
-        return ST_rt_replace_reject;
-    }
-
-    rt__set_from_addr(node_spot, krpc->nid, addr, base_qual);
-    return ST_rt_replace_accept;
-}
-
-stat_t rt_random_replace_contact(const pnode_t new_pnode, u8 base_qual) {
-    /*
-    Possibly randomly replaces the contact for `new_pnode` in the routing
-    table.
-
-    The old contact has a chance to be evicted inversely related to
-    its quality given by the quality table.
-
-    If no contact is evicted, the new_contact is simply ignored.
-    */
-
-    rt_nodeinfo_t *node_spot = rt_get_cell(new_pnode.nid);
-
-    if (rt_check_evict(node_spot->quality, base_qual)) {
-        // Assumes the relevant fields are contiguous in memory
-        if (validate_pnode(new_pnode)) {
-            node_spot->pnode = new_pnode;
-            node_spot->quality = CLIP_Q(base_qual);
-            return ST_rt_replace_accept;
-        } else {
-            return ST_rt_replace_invalid;
-        }
-    } else {
-        return ST_rt_replace_reject;
-    }
-}
-
-bool rt_check_evict(u8 cur_qual, u8 cand_qual) {
+static inline bool rt_check_evict(u8 cur_qual, u8 cand_qual) {
     /*
     Checks if a node with quality `cur_qual` should be replaced with
     one of quality `cand_qual`.
@@ -189,25 +68,115 @@ bool rt_check_evict(u8 cur_qual, u8 cand_qual) {
     return randint(0, 1 << (cur_qual - cand_qual)) == 0;
 }
 
+static inline bool is_pnode_empty(const pnode_t pnode) {
+    return 0 == *(u64 *)pnode.nid.raw;
+}
+
+static inline bool eq_nodeinfo_nid(const rt_nodeinfo_t *node, const nih_t nid) {
+    return (0 == memcmp(node->pnode.nid.raw, nid.raw, NIH_LEN));
+}
+
+inline bool validate_addr(u32 in_addr, u16 sin_port) {
+
+    // in_addr and sin_port are big_endian
+    char *addr_bytes = (char *)&in_addr;
+    unsigned char a = addr_bytes[0];
+    unsigned char b = addr_bytes[1];
+    unsigned char c = addr_bytes[2];
+    unsigned char d = addr_bytes[3];
+
+    if (be16toh(sin_port) <= 1024) {
+        return false;
+    }
+
+    if (((a & 0xf0) == 240) || (a == 0) || (a == 10) || (a == 127) ||
+        (a == 100 && (b & 0xc0) == 64) || (a == 172 && (b & 0xf0) == 16) ||
+        (a == 198 && (b & 0xfe) == 18) || (a == 169 && b == 254) ||
+        (a == 192 && b == 168) || (a == 192 && b == 0 && c == 0) ||
+        (a == 192 && b == 0 && c == 2) || (a == 192 && b == 31 && c == 196) ||
+        (a == 192 && b == 51 && c == 100) ||
+        (a == 192 && b == 52 && c == 193) ||
+        (a == 192 && b == 175 && c == 48) ||
+        (a == 198 && b == 51 && c == 100) || (a == 203 && b == 0 && c == 113) ||
+        (a == 255 && b == 255 && c == 255 && d == 255)) {
+        return false;
+    }
+
+    return true;
+}
+
+#ifdef RT_BIG
+static inline rt_nodeinfo_t *rt_get_cell_by_coords(u8 a, u8 b, u8 c) {
+    return g_rt + ((u32)a << 16) + ((u32)b << 8) + c;
+}
+#else
+static inline rt_nodeinfo_t *rt_get_cell_by_coords(u8 a, u8 b) {
+    return g_rt + ((u32)a << 8) + b;
+}
+#endif
+
+static inline rt_nodeinfo_t *rt_get_cell(const nih_t nid) {
+    /*
+    Returns the index in the routing table corresponding to the given
+    nid. Obviously not injective.
+
+    ASSUMES 8 CONTACTS AT DEPTH 3
+    */
+    u8 a = nid.raw[0];
+    u8 b = nid.raw[1];
+#ifdef RT_BIG
+    u8 c = nid.raw[2];
+    return rt_get_cell_by_coords(a, b, c);
+#endif
+    return rt_get_cell_by_coords(a, b);
+}
+
+static inline void rt__set_from_addr(rt_nodeinfo_t *cell, const nih_t nid,
+                                     const struct sockaddr_in *addr, u8 qual) {
+    cell->pnode.nid = nid;
+    // These are all in network byte order
+    cell->pnode.peerinfo.sin_port = addr->sin_port;
+    cell->pnode.peerinfo.in_addr = addr->sin_addr.s_addr;
+    cell->quality = CLIP_Q(qual);
+}
+
+// PUBLIC FUNCTIONS
+
+void rt_insert_contact(const parsed_msg *krpc, const struct sockaddr_in *addr,
+                       u8 base_qual) {
+
+    if (!validate_addr(addr->sin_addr.s_addr, addr->sin_port)) {
+        st_inc(ST_rt_replace_invalid);
+    }
+
+    rt_nodeinfo_t *node_spot = rt_get_cell(krpc->nid);
+
+    if (!rt_check_evict(node_spot->quality, base_qual)) {
+        st_inc(ST_rt_replace_reject);
+    }
+
+    rt__set_from_addr(node_spot, krpc->nid, addr, base_qual);
+    st_inc(ST_rt_replace_accept);
+}
+
 void rt_adj_quality(const nih_t nid, i64 delta) {
     /*
     Adjusts the quality of the routing contact "nid", if it
     can be found. Otherwise, does nothing.
     */
 
-    rt_nodeinfo_t *cur_nodeinfo = rt_get_cell(nid);
+    rt_nodeinfo_t *cell = rt_get_cell(nid);
 
     // the contact we're trying to adjust has been replaced!
     // just do nothing in this case
-    if (!eq_nodeinfo_nid(cur_nodeinfo, nid)) {
+    if (!eq_nodeinfo_nid(cell, nid)) {
         return;
     }
 
-    u8 new_qual = cur_nodeinfo->quality + delta;
-    cur_nodeinfo->quality = CLIP_Q(new_qual);
+    cell->quality = CLIP_Q(cell->quality + delta);
 }
 
-rt_nodeinfo_t *rt_get_valid_neighbor_contact(const nih_t target) {
+rt_nodeinfo_t *rt_get_neighbor_contact(const nih_t target) {
     /*
     Returns a nid from the array of nids `narr` whose first two bytes
     match the target.

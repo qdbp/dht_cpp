@@ -7,8 +7,6 @@
 
 #define MSG_BUF_LEN 512
 
-void write_sid(char *, const nih_t);
-
 u32 msg_q_gp(char *restrict buf, const nih_t nid, const nih_t ih, u16 tok);
 u32 msg_q_fn(char *restrict buf, const pnode_t dest, const nih_t target);
 u32 msg_q_pg(char *restrict buf, const nih_t nid);

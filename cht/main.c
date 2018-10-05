@@ -82,7 +82,7 @@ static inline void cb_alloc(uv_handle_t *client, size_t suggested_size,
 
     if ((g_recv_bufs_num_in_use > MAX_N_SEND) ||
         (buf_ix = find_unused(g_recv_bufs_in_use, N_RECV)) < 0) {
-        DEBUG("no free recv buffers!")
+        DEBUG("No free recv buffers!")
         buf->len = 0;
         return;
     }
@@ -143,7 +143,6 @@ static void cb_send_msg(uv_udp_send_t *req, int status) {
 
 static inline bool send_msg(char *msg, u32 len, const struct sockaddr_in *dest,
                             stat_t acct) {
-
     int buf_ix;
 
     if (!validate_addr(dest->sin_addr.s_addr, dest->sin_port)) {
@@ -153,8 +152,7 @@ static inline bool send_msg(char *msg, u32 len, const struct sockaddr_in *dest,
 
     if (g_send_buf_objs_num_in_use > MAX_N_SEND ||
         (buf_ix = find_unused(g_send_buf_objs_in_use, N_SEND)) < 0) {
-
-        DEBUG("no free send buffers!")
+        DEBUG("No free send buffers!")
         st_inc(ST_tx_msg_drop_overflow);
         return false;
     }
@@ -174,11 +172,6 @@ static inline bool send_msg(char *msg, u32 len, const struct sockaddr_in *dest,
         uv_udp_send(&g_requests[buf_ix], &g_udp_server, g_send_buf_objs[buf_ix],
                     1, (struct sockaddr *)dest, &cb_send_msg);
 
-#ifdef SEND_TRACE
-    DEBUG("sending %s[%lu] to %08x:%04hx", stat_names[acct], len,
-          be32toh(dest->sin_addr.s_addr), be16toh(dest->sin_port))
-#endif
-
     if (status >= 0) {
         st_inc(acct);
         st_inc(ST_tx_tot);
@@ -190,7 +183,7 @@ static inline bool send_msg(char *msg, u32 len, const struct sockaddr_in *dest,
     }
 }
 
-inline static void send_to_pnode(char *msg, u32 len, const pnode_t pnode,
+static inline void send_to_pnode(char *msg, u32 len, const pnode_t pnode,
                                  stat_t acct) {
     const struct sockaddr_in dest = {
         .sin_family = AF_INET,
@@ -201,7 +194,6 @@ inline static void send_to_pnode(char *msg, u32 len, const pnode_t pnode,
 }
 
 void ping_sweep_nodes(const parsed_msg *krpc_msg) {
-
     char ping[MSG_BUF_LEN];
     u32 len;
 
@@ -224,24 +216,24 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
         len = msg_r_pg(reply, krpc_msg);
         send_msg(reply, len, saddr, ST_tx_r_pg);
 
-        rt_add_sender_as_contact(krpc_msg, saddr, 1);
+        rt_insert_contact(krpc_msg, saddr, 0);
         break;
 
     case MSG_Q_FN:
 
-        node = rt_get_valid_neighbor_contact(krpc_msg->nid);
+        node = rt_get_neighbor_contact(krpc_msg->nid);
         if (node != NULL) {
             len = msg_r_fn(reply, krpc_msg, node->pnode);
             send_msg(reply, len, saddr, ST_tx_r_fn);
         }
-        rt_add_sender_as_contact(krpc_msg, saddr, 2);
+        rt_insert_contact(krpc_msg, saddr, 0);
         break;
 
     case MSG_Q_GP:
         st_inc(ST_rx_q_gp);
 
         if (gpm_decide_pursue_q_gp_ih(&gp_tok, krpc_msg)) {
-            node = rt_get_valid_neighbor_contact(krpc_msg->ih);
+            node = rt_get_neighbor_contact(krpc_msg->ih);
             if (!node) {
                 break;
             }
@@ -251,16 +243,18 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
         }
 
         // reply to the sender node
-        node = rt_get_valid_neighbor_contact(krpc_msg->nid);
+        node = rt_get_neighbor_contact(krpc_msg->nid);
         if (node != NULL) {
             len = msg_r_fn(reply, krpc_msg, node->pnode);
             send_msg(reply, len, saddr, ST_tx_r_gp);
         }
-        rt_add_sender_as_contact(krpc_msg, saddr, 1);
+        rt_insert_contact(krpc_msg, saddr, 1);
         break;
 
     case MSG_Q_AP:
         st_inc(ST_rx_q_ap);
+
+        DEBUG("got q_ap!")
 
         // u16 ap_port;
         // if (krpc_msg->ap_implied_port) {
@@ -283,7 +277,7 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
         len = msg_r_pg(reply, krpc_msg);
         send_msg(reply, len, saddr, ST_tx_r_ap);
 
-        rt_add_sender_as_contact(krpc_msg, saddr, 3);
+        rt_insert_contact(krpc_msg, saddr, 3);
         break;
 
     case MSG_R_FN:
@@ -304,7 +298,7 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
             st_inc(ST_rx_r_gp_values);
             // TODO handle peer
 
-            rt_add_sender_as_contact(krpc_msg, saddr, 4);
+            rt_insert_contact(krpc_msg, saddr, 4);
         }
 
         if (krpc_msg->n_nodes > 0) {
@@ -333,7 +327,7 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
 
     case MSG_R_PG:
         st_inc(ST_rx_r_pg);
-        rt_add_sender_as_contact(krpc_msg, saddr, 2);
+        rt_insert_contact(krpc_msg, saddr, 2);
         break;
 
     default:
@@ -358,7 +352,6 @@ void loop_statgather_cb(uv_timer_t *timer) {
 }
 
 void loop_bootstrap_cb(uv_timer_t *timer) {
-
     char msg[MSG_BUF_LEN];
     nih_t random_target;
 
@@ -371,7 +364,6 @@ void loop_bootstrap_cb(uv_timer_t *timer) {
 }
 
 int main(int argc, char *argv[]) {
-
     init_subsystems();
 
     int status;

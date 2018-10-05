@@ -19,7 +19,6 @@ const char Q_FN_PROTO[] = "d1:ad2:id20:"
                           "e1:q9:find_node1:t1:" OUR_TOK "1:y1:qe";
 
 #define Q_FN_LEN (sizeof(Q_FN_PROTO) - 1)
-// #define Q_FN_LEN 12 + 20 + 11 + 20 + 28
 #define Q_FN_SID_OFFSET 12
 #define Q_FN_TARGET_OFFSET 43
 
@@ -88,7 +87,7 @@ const char R_GP_PROTO_BASE[] = "d1:rd2:id20:"
 const char R_EPILOGUE[] = "1:y1:re";
 #define R_EPILOGUE_LEN (sizeof(R_EPILOGUE) - 1)
 
-inline static u32 write_tok(char *restrict buf, const parsed_msg *krpc) {
+static inline u32 write_tok(char *restrict buf, const parsed_msg *krpc) {
     assert(krpc->tok_len < 1000);
     u32 offset = sprintf(buf, "%u:", krpc->tok_len);
     // Can't use sprintf because of possible null bytes
@@ -96,13 +95,13 @@ inline static u32 write_tok(char *restrict buf, const parsed_msg *krpc) {
     return offset + krpc->tok_len;
 }
 
-inline static void write_sid_raw(char *restrict buf) {
+static inline void write_sid_raw(char *restrict buf) {
     for (int ix = 0; ix < NIH_LEN; ix++) {
         buf[ix] ^= SID_MASK[ix];
     }
 }
 
-inline void write_sid(char *restrict buf, const nih_t nid) {
+static inline void write_sid(char *restrict buf, const nih_t nid) {
     SET_NIH(buf, nid.raw);
     write_sid_raw(buf);
 }

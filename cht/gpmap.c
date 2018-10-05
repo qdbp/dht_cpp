@@ -88,7 +88,7 @@ inline bool get_vacant_tok(u16 *dst) {
     return false;
 }
 
-inline static void set_ih_status(u16 tok, const nih_t nid, const nih_t ih,
+static inline void set_ih_status(u16 tok, const nih_t nid, const nih_t ih,
                                  u8 hop) {
 
     gpm_ih_status_t *cell = &g_ifl_buf[tok];
@@ -105,7 +105,7 @@ inline static void set_ih_status(u16 tok, const nih_t nid, const nih_t ih,
 
 // Writes up to MAX_GP_PNODES nodes to the next hop structure; could be less,
 // writes the actual number written to the structure.
-inline static void find_best_hops(gpm_next_hop_t *next_hop,
+static inline void find_best_hops(gpm_next_hop_t *next_hop,
                                   const parsed_msg *krpc_msg, const nih_t ih) {
     u8 n_pnodes =
         (MAX_GP_PNODES < krpc_msg->n_nodes) ? MAX_GP_PNODES : krpc_msg->n_nodes;

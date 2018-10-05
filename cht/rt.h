@@ -48,15 +48,8 @@ void rt_init(void);
 bool validate_addr(u32, u16);
 bool validate_nodeinfo(const rt_nodeinfo_t *);
 
-stat_t rt_random_replace_contact(const pnode_t pnode, u8);
-stat_t rt_add_sender_as_contact(const parsed_msg *, const struct sockaddr_in *,
-                                u8);
-
-rt_nodeinfo_t *rt_get_valid_neighbor_contact(const nih_t nid);
-rt_nodeinfo_t *rt_get_cell(const nih_t nid);
-// rt_nodeinfo_t *rt_get_cell_by_coords(u8, u8, u8);
-
+void rt_insert_contact(const parsed_msg *, const struct sockaddr_in *, u8);
+rt_nodeinfo_t *rt_get_neighbor_contact(const nih_t nid);
 void rt_adj_quality(const nih_t, i64);
-bool rt_check_evict(u8, u8);
 
 #endif // DHT_RT_H
