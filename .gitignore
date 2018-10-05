@@ -2,6 +2,7 @@ callgrind*
 dht_*
 dht
 rtd
+**/a.out
 
 tags
 
