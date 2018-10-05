@@ -43,7 +43,7 @@ inline void st_inc(stat_t stat) {
 }
 
 inline void st_set(stat_t stat, u64 val) {
-    g_ctr[stat] = stat;
+    g_ctr[stat] = val;
 }
 
 inline void st_inc_debug(stat_t stat) {

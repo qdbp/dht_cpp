@@ -213,6 +213,7 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
 
     switch (krpc_msg->method) {
     case MSG_Q_PG:
+        st_inc(ST_rx_q_pg);
         len = msg_r_pg(reply, krpc_msg);
         send_msg(reply, len, saddr, ST_tx_r_pg);
 
@@ -220,6 +221,7 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
         break;
 
     case MSG_Q_FN:
+        st_inc(ST_rx_q_fn);
 
         node = rt_get_neighbor_contact(krpc_msg->nid);
         if (node != NULL) {
