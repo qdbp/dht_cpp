@@ -69,7 +69,7 @@ static inline bool rt_check_evict(u8 cur_qual, u8 cand_qual) {
 }
 
 static inline bool is_pnode_empty(const pnode_t pnode) {
-    return pnode.nid.checksum != 0;
+    return pnode.nid.checksum == 0;
 }
 
 static inline bool eq_nodeinfo_nid(const rt_nodeinfo_t *node, const nih_t nid) {
