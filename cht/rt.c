@@ -179,23 +179,25 @@ rt_nodeinfo_t *rt_get_neighbor_contact(const nih_t target) {
     match the target.
     */
 
-    rt_nodeinfo_t *neighbor_cell = rt_get_cell(target);
+    rt_nodeinfo_t *out_cell = rt_get_cell(target);
 
-    if (!is_pnode_empty(neighbor_cell->pnode)) {
-        return neighbor_cell;
+    if (!is_pnode_empty(out_cell->pnode)) {
+        return out_cell;
     }
-
-    rt_nodeinfo_t *alt_cell;
 
     // try one neighbor cell, then fail
-    if (g_dkad_offsets[(int)target.raw[2]] > 0) {
-        alt_cell = neighbor_cell + 1;
+#ifdef RT_BIG
+    if (g_dkad_offsets[target.b] > 0) {
+#else
+    if (g_dkad_offsets[target.c] > 0) {
+#endif
+        out_cell = out_cell + 1;
     } else {
-        alt_cell = neighbor_cell - 1;
+        out_cell = out_cell - 1;
     }
 
-    if (!is_pnode_empty(alt_cell->pnode)) {
-        return alt_cell;
+    if (!is_pnode_empty(out_cell->pnode)) {
+        return out_cell;
     } else {
         st_inc(ST_rt_miss);
         return NULL;
@@ -209,7 +211,7 @@ void rt_nuke_node(const nih_t target) {
 
     rt_nodeinfo_t *cell = rt_get_cell(target);
     // check the node hasn't been replaced in the interim
-    if (0 == memcmp(cell, target.raw, NIH_LEN)) {
+    if (cell->pnode.nid.checksum == target.checksum) {
         memset(cell, 0, sizeof(rt_nodeinfo_t));
     }
 }
