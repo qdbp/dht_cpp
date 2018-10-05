@@ -37,11 +37,11 @@
 typedef union nih_u {
     char raw[NIH_LEN];
     struct {
-        char a;
-        char b;
-        char c;
+        u8 a;
+        u8 b;
+        u8 c;
         char _[7];
-        char ctl_byte;
+        u8 ctl_byte;
         char __[5];
         u32 checksum;
     };
