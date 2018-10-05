@@ -319,8 +319,6 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
                     gpm_register_q_gp_ihash(next_node.pnodes[ix].nid,
                                             next_node.ih, next_node.hop_ctr + 1,
                                             gp_tok);
-                    // DEBUG("pursuing ih, hop %d/%d!", next_node.hop_ctr + 1,
-                    // ix)
                 }
             end_pnodes_iter:;
             }
