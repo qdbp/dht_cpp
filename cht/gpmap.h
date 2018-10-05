@@ -4,6 +4,7 @@
 // The GetPeersManager engine
 
 #define MAX_GP_PNODES 2
+#define BULLSHIT_DKAD 100
 
 #include "bdecode.h"
 #include <stdbool.h>

@@ -231,7 +231,6 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
             len = msg_r_fn(reply, krpc_msg, node->pnode);
             send_msg(reply, len, saddr, ST_tx_r_fn);
         }
-
         rt_add_sender_as_contact(krpc_msg, saddr, 2);
         break;
 
@@ -239,13 +238,10 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
         st_inc(ST_rx_q_gp);
 
         if (gpm_decide_pursue_q_gp_ih(&gp_tok, krpc_msg)) {
-
             node = rt_get_valid_neighbor_contact(krpc_msg->ih);
-
             if (!node) {
                 break;
             }
-
             len = msg_q_gp(reply, node->pnode.nid, krpc_msg->ih, gp_tok);
             send_to_pnode(reply, len, node->pnode, ST_tx_q_gp);
             gpm_register_q_gp_ihash(node->pnode.nid, krpc_msg->ih, 0, gp_tok);
@@ -257,7 +253,6 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
             len = msg_r_fn(reply, krpc_msg, node->pnode);
             send_msg(reply, len, saddr, ST_tx_r_gp);
         }
-
         rt_add_sender_as_contact(krpc_msg, saddr, 1);
         break;
 
@@ -395,8 +390,8 @@ int main(int argc, char *argv[]) {
     // INIT statgather
     status = uv_timer_init(main_loop, &g_statgather_timer);
     CHECK(status, "statgather timer init");
-    status =
-        uv_timer_start(&g_statgather_timer, &loop_statgather_cb, 6000, 6000);
+    //     status =
+    uv_timer_start(&g_statgather_timer, &loop_statgather_cb, 6000, 6000);
     CHECK(status, "statgather start")
 
     // INIT BOOTSTRAP

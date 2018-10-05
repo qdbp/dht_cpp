@@ -114,31 +114,42 @@ inline static void find_best_hops(gpm_next_hop_t *next_hop,
     u8 this_ix;
     u8 next_dkad;
     u8 next_ix;
-    u8 best_dkads[MAX_GP_PNODES] = {160};
+    u8 best_dkads[MAX_GP_PNODES] = {0};
     u8 best_ixes[MAX_GP_PNODES] = {0};
+
+    for (u8 ix = 0; ix < MAX_GP_PNODES; ix++) {
+        best_dkads[ix] = 160;
+    }
 
     bool displace = false;
 
     for (u8 ix = 0; ix < krpc_msg->n_nodes; ix += 1) {
         this_dkad = dkad(ih, krpc_msg->nodes[ix].nid);
         this_ix = ix;
+        // DEBUG("Got new dkad %d at %d", this_dkad, this_ix)
         for (u8 jx = 0; jx < MAX_GP_PNODES; jx++) {
-            if (this_dkad < best_dkads[jx]) {
+            if (this_dkad < best_dkads[jx] && this_dkad > BULLSHIT_DKAD) {
                 displace = true;
+                // DEBUG("Found better ix %d at jx %d in list", this_ix, jx);
             }
             if (displace) {
                 next_dkad = best_dkads[jx];
                 next_ix = best_ixes[jx];
                 best_dkads[jx] = this_dkad;
                 best_ixes[jx] = this_ix;
+                // DEBUG("[jx %d] moved ix %d (dkad %d) to where %d (dkad %d)
+                // was",
+                //       jx, this_ix, this_dkad, next_ix, next_dkad);
                 this_ix = next_ix;
                 this_dkad = next_dkad;
             }
         }
+        displace = false;
         st_click_dkad(this_dkad);
     }
 
     for (int dx = 0; dx < n_pnodes; dx++) {
+        // DEBUG("Writing ix %d (dkad %d)", best_ixes[dx], best_dkads[dx]);
         next_hop->pnodes[dx] = krpc_msg->nodes[best_ixes[dx]];
     }
 

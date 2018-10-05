@@ -16,4 +16,6 @@ u32 msg_r_fn(char *restrict buf, const parsed_msg *, const pnode_t);
 u32 msg_r_gp(char *restrict buf, const parsed_msg *, const pnode_t);
 u32 msg_r_pg(char *restrict buf, const parsed_msg *);
 
+void init_msg(void);
+
 #endif // DHT_MSG_H
