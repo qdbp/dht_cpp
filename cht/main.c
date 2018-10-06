@@ -340,6 +340,8 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
 }
 
 void init_subsystems(void) {
+    VERBOSE("Initializing ctl...")
+    ctl_init();
     VERBOSE("Initializing rt...")
     rt_init();
     VERBOSE("Initializing st...")
