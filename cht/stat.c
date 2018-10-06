@@ -1,5 +1,6 @@
 #include "ctl.h"
 #include "dht.h"
+#include "gpmap.h"
 #include "log.h"
 #include "stat.h"
 #include <errno.h>
@@ -30,8 +31,9 @@ struct timespec __st_now = {0};
     st_old_ms = st_now_ms;                                                     \
     st_now_ms = (__st_now.tv_sec * 1000) + (__st_now.tv_nsec / 1000000);
 
-#ifdef STAT_DKAD
+#ifdef STAT_AUX
 static u64 g_dkad_ctr[161] = {0};
+static u64 g_n_hops_ctr[GP_MAX_HOPS] = {0};
 #endif
 
 void st_init() {
@@ -67,11 +69,18 @@ inline void st_add(stat_t stat, u32 val) {
 }
 
 inline void st_click_dkad(u8 dkad) {
-#ifdef STAT_DKAD
+#ifdef STAT_AUX
     assert(dkad <= 160);
-    g_dkat_ctr[dkad]++;
+    g_dkad_ctr[dkad]++;
 #endif
 };
+
+inline void st_click_gp_n_hops(u8 n_hops) {
+#ifdef STAT_AUX
+    assert(n_hops < GP_MAX_HOPS);
+    g_n_hops_ctr[n_hops]++;
+#endif
+}
 
 inline u64 st_get(stat_t stat) {
     return g_ctr[stat];
@@ -108,8 +117,8 @@ void st_rollover(void) {
         fprintf(csv, "\n");
     }
     ENDWITH(csv, "Could not open " STAT_CSV_FN " for appending")
-#ifdef STAT_DKAD
-    WITH_FILE(csv, STAT_DKAD_FN, "w") {
+#ifdef STAT_AUX
+    WITH_FILE(csv, STAT_AUX_FN, "w") {
 
         for (int ix = 0; ix <= 160; ix++) {
             fprintf(csv, "%d,", ix);
@@ -119,7 +128,7 @@ void st_rollover(void) {
             fprintf(csv, "%d,", g_dkad_ctr[ix]);
         }
     }
-    ENDWITH(csv, "Could not open CSV " STAT_DKAD_FN " for writing")
-#endif // STAT_DKAD
+    ENDWITH(csv, "Could not open CSV " STAT_AUX_FN " for writing")
+#endif // STAT_AUX
 #endif // STAT_CSV
 }

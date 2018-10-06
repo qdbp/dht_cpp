@@ -142,7 +142,10 @@ void st_inc(stat_t);
 void st_inc_debug(stat_t);
 void st_add(stat_t, u32);
 void st_set(stat_t, u64);
+
+// aux stats
 void st_click_dkad(u8);
+void st_click_gp_n_hops(u8);
 
 u64 st_get(stat_t);
 u64 st_get_old(stat_t);

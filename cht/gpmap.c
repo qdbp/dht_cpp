@@ -17,9 +17,6 @@ static u64 now_ms;
 
 #define IFL_BIN_SIZE 64
 #define IFL_EXPIRE_MS 200
-#ifndef IFL_MAX_HOPS
-#define IFL_MAX_HOPS 6
-#endif
 
 typedef struct gpm_ih_status {
     nih_t ih;              // The infohash being tracked
@@ -73,9 +70,9 @@ static inline void set_ih_status(u16 tok, const nih_t nid, const nih_t ih,
 // Writes up to MAX_GP_PNODES nodes to the next hop structure; could be less,
 // writes the actual number written to the structure.
 static inline void find_best_hops(gpm_next_hop_t *next_hop,
-                                  const parsed_msg *krpc_msg, const nih_t ih) {
+                                  const parsed_msg *krpc, const nih_t ih) {
     u8 n_pnodes =
-        (MAX_GP_PNODES < krpc_msg->n_nodes) ? MAX_GP_PNODES : krpc_msg->n_nodes;
+        (MAX_GP_PNODES < krpc->n_nodes) ? MAX_GP_PNODES : krpc->n_nodes;
 
     u8 this_dkad;
     u8 this_ix;
@@ -90,8 +87,8 @@ static inline void find_best_hops(gpm_next_hop_t *next_hop,
 
     bool displace = false;
 
-    for (u8 ix = 0; ix < krpc_msg->n_nodes; ix += 1) {
-        this_dkad = dkad(ih, krpc_msg->nodes[ix].nid);
+    for (u8 ix = 0; ix < krpc->n_nodes; ix += 1) {
+        this_dkad = dkad(ih, krpc->nodes[ix].nid);
         this_ix = ix;
         for (u8 jx = 0; jx < MAX_GP_PNODES; jx++) {
             if (this_dkad < best_dkads[jx] && this_dkad > BULLSHIT_DKAD) {
@@ -111,7 +108,7 @@ static inline void find_best_hops(gpm_next_hop_t *next_hop,
     }
 
     for (int dx = 0; dx < n_pnodes; dx++) {
-        next_hop->pnodes[dx] = krpc_msg->nodes[best_ixes[dx]];
+        next_hop->pnodes[dx] = krpc->nodes[best_ixes[dx]];
     }
 
     next_hop->n_pnodes = n_pnodes;
@@ -151,7 +148,8 @@ bool get_vacant_tok(u16 *dst) {
     return false;
 }
 
-bool gpm_decide_pursue_q_gp_ih(u16 *assign_tok, const parsed_msg *rcvd) {
+bool gpm_decide_pursue_q_gp_ih(u16 *restrict assign_tok,
+                               const parsed_msg *rcvd) {
     // TODO connect to db and do actual business logic checks
 
     if (get_vacant_tok(assign_tok)) {
@@ -163,7 +161,7 @@ bool gpm_decide_pursue_q_gp_ih(u16 *assign_tok, const parsed_msg *rcvd) {
 }
 
 void gpm_register_q_gp_ihash(nih_t nid, nih_t ih, u8 hop, u16 tok) {
-    if (hop > IFL_MAX_HOPS) {
+    if (hop > GP_MAX_HOPS) {
         st_inc(ST_gpm_ih_drop_too_many_hops);
         return;
     }
@@ -171,26 +169,26 @@ void gpm_register_q_gp_ihash(nih_t nid, nih_t ih, u8 hop, u16 tok) {
     st_inc(ST_gpm_ih_inserted);
 };
 
-bool gpm_extract_r_gp_ih(gpm_next_hop_t *restrict next_hop,
-                         const parsed_msg *krpc_msg) {
+bool gpm_extract_tok(gpm_next_hop_t *restrict next_hop,
+                     const parsed_msg *krpc) {
 
-    assert(krpc_msg->n_nodes > 0);
-    assert(krpc_msg->tok_len == 3);
+    assert(krpc->n_nodes > 0);
+    assert(krpc->tok_len == 3);
 
-    u16 tok = *(u16 *)(krpc_msg->tok);
+    u16 tok = *(u16 *)(krpc->tok);
     gpm_ih_status_t *cell = &g_ifl_buf[tok];
 
     if (!cell->is_set) {
         st_inc(ST_gpm_r_gp_lookup_empty);
         return false;
-    } else if (cell->last_nid_checksum != krpc_msg->nid.checksum) {
+    } else if (cell->last_nid_checksum != krpc->nid.checksum) {
         st_inc(ST_gpm_r_gp_bad_checksum);
         return false;
     }
 
-    // u8 best_node = find_best_hop(krpc_msg, extract->ih);
+    // u8 best_node = find_best_hop(krpc, extract->ih);
     next_hop->ih = cell->ih;
-    find_best_hops(next_hop, krpc_msg, cell->ih);
+    find_best_hops(next_hop, krpc, cell->ih);
     next_hop->hop_ctr = cell->hop_ctr;
 
     // Important! This is how we clean up. There is no separate command or
@@ -199,3 +197,10 @@ bool gpm_extract_r_gp_ih(gpm_next_hop_t *restrict next_hop,
 
     return true;
 };
+
+void gpm_clear_tok(const parsed_msg *krpc) {
+    gpm_ih_status_t *cell = &g_ifl_buf[*(u16 *)krpc->tok];
+    if (cell->last_nid_checksum == krpc->nid.checksum) {
+        unset_cell(cell);
+    }
+}

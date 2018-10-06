@@ -300,6 +300,13 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
 
         if (krpc_msg->n_peers > 0) {
             st_inc(ST_rx_r_gp_values);
+#ifdef STAT_AUX
+            if (gpm_extract_tok(&next_node, krpc_msg)) {
+                st_click_gp_n_hops(next_node.hop_ctr + 1);
+            }
+#else
+            gpm_clear_tok(krpc_msg);
+#endif
             // TODO handle peer
             rt_insert_contact(krpc_msg, saddr, 4);
         }
@@ -309,7 +316,7 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
             // TODO handle gp nodes
             ping_sweep_nodes(krpc_msg);
 
-            if (gpm_extract_r_gp_ih(&next_node, krpc_msg)) {
+            if (gpm_extract_tok(&next_node, krpc_msg)) {
                 for (int ix = 0; ix < next_node.n_pnodes; ix++) {
                     if (!get_vacant_tok(&gp_tok)) {
                         goto end_pnodes_iter;

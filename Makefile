@@ -8,7 +8,7 @@ CPPFLAGS = -DLOGLEVEL=1 -DSTAT_CSV -Wall -Werror -luv
 .PHONY: rtdump valgrind
 
 build:
-	$(CC) $(CFLAGS) $(FAST) cht/*.c -o dht_fast -DCTL_PPS_TARGET=1000.0
+	$(CC) $(CFLAGS) $(FAST) cht/*.c -o dht_fast -DRT_BIG
 
 build_gcc:
 	$(GCC) $(CFLAGS) $(FAST) -frename-registers cht/*.c -o dht_fast_gcc
