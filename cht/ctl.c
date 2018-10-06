@@ -7,6 +7,10 @@
 
 // PUBLIC FUNCTIONS
 
+void ctl_init(void) {
+    st_set(ST_ctl_ping_thresh, 0);
+}
+
 inline bool ctl_decide_ping(nih_t nid) {
     return nid.ctl_byte >= st_get(ST_ctl_ping_thresh);
 }
@@ -18,9 +22,9 @@ void ctl_rollover_hook(void) {
 
     u8 delta = cur_thresh > 230 ? 1 : 5;
     if (ping_rate < CTL_PPS_TARGET) {
-        cur_thresh -= delta;
+        cur_thresh = delta <= cur_thresh ? cur_thresh - delta : 0;
     } else {
         cur_thresh += delta;
     }
-    st_set(ST_ctl_ping_thresh, cur_thresh < 0 ? 0 : cur_thresh);
+    st_set(ST_ctl_ping_thresh, cur_thresh);
 }
