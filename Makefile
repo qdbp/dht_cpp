@@ -1,17 +1,17 @@
 C = /usr/bin/clang
 CPP = /usr/bin/clang++
 GCC = /usr/bin/gcc
-FAST = -march=native -Ofast -flto # -finline-functions
+FAST = -march=native -Ofast -flto -finline-functions
 CFLAGS = -DLOGLEVEL=1 -DSTAT_CSV -Wall -Werror -luv
 CPPFLAGS = -DLOGLEVEL=1 -DSTAT_CSV -Wall -Werror -luv
 
-.PHONY: rtdump
+.PHONY: rtdump valgrind
 
 build:
-	$(CC) $(CFLAGS) $(FAST) cht/*.c -o dht_fast
+	$(CC) $(CFLAGS) $(FAST) cht/*.c -o dht_fast -DCTL_PPS_TARGET=1000.0
 
 build_gcc:
-	$(CC) $(CFLAGS) $(FAST) -frename-registers cht/*.c -o dht_fast_gcc
+	$(GCC) $(CFLAGS) $(FAST) -frename-registers cht/*.c -o dht_fast_gcc
 
 run: build
 	./dht_fast
@@ -30,3 +30,6 @@ build_tbd:
 
 rtdump: rtdump/main.c
 	$(GCC) $(CFLAGS) $(FAST) rtdump/main.c -o rtd
+
+valgrind: build
+	valgrind --tool=callgrind ./dht_fast
