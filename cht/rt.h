@@ -11,10 +11,10 @@
 /// cache-unfriendly This can be considered experimental (even though it was the
 /// first to be used).
 #ifdef RT_BIG
-#define RT_TOTAL_CONTACTS (256 * 256 * 256)
+#define RT_SIZE (256 * 256 * 256)
 #define RT_FN "./data/rt3.dat"
 #else
-#define RT_TOTAL_CONTACTS (256 * 256)
+#define RT_SIZE (256 * 256)
 #define RT_FN "./data/rt.dat"
 #endif
 
@@ -24,7 +24,7 @@
 #define CLIP_Q(qual) ((qual) > RT_MAX_Q ? RT_MAX_Q : (qual))
 
 typedef struct rt_nodeinfo_t {
-    _Alignas(32) pnode_t pnode; // 20
+    _Alignas(32) pnode_t pnode; // 26
     u8 quality : RT_Q_WIDTH;    // 27
     // 5 bytes FREE
 } rt_nodeinfo_t;

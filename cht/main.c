@@ -28,6 +28,8 @@
 #define MAX_N_RECV (3 * (N_RECV >> 2))
 
 // RECEIVE BUFFER MANAGEMENT
+// the first 4 bytes of the buffer store its index into the receive buffers
+// array, so that the receive callback can mark it as free
 static char g_recv_bufs[N_RECV][BD_MAXLEN + sizeof(u32)] = {{0}};
 static bool g_recv_bufs_in_use[N_RECV] = {0};
 static u32 g_recv_bufs_num_in_use = 0;
@@ -101,12 +103,19 @@ static inline void cb_alloc(uv_handle_t *client, size_t suggested_size,
 static void cb_recv_msg(uv_udp_t *handle, ssize_t nread, const uv_buf_t *rcvbuf,
                         const struct sockaddr *saddr, unsigned flags) {
 
-    u32 buf_ix = *(u32 *)((u64)rcvbuf->base - sizeof(u32));
+    u32 buf_ix = *(u32 *)((u8 *)rcvbuf->base - sizeof(u32));
 
     g_recv_bufs_num_in_use--;
     g_recv_bufs_in_use[buf_ix] = false;
 
-    if (saddr == NULL) {
+    // technically these are separate cases, but for now we just ignore it
+    if (nread < 0) {
+        st_inc(ST_rx_err);
+        DEBUG("%s", uv_strerror(nread))
+        return;
+    }
+
+    if (saddr == NULL || nread == 0) {
         return;
     }
 
@@ -281,8 +290,6 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
         // ap_port)])
         len = msg_r_pg(reply, krpc_msg);
         send_msg(reply, len, saddr, ST_tx_r_ap);
-
-        rt_insert_contact(krpc_msg, saddr, 3);
         break;
 
     case MSG_R_FN:
@@ -293,6 +300,7 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
             break;
         }
         ping_sweep_nodes(krpc_msg);
+        // No add contact since we only q_fn the bootstrap node
         break;
 
     case MSG_R_GP:
@@ -301,12 +309,12 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
         if (krpc_msg->n_peers > 0) {
             st_inc(ST_rx_r_gp_values);
 #ifdef STAT_AUX
-            if (gpm_extract_tok(&next_node, krpc_msg)) {
-                st_click_gp_n_hops(next_node.hop_ctr + 1);
+            int val;
+            if ((val = gpm_get_tok_hops(krpc_msg)) > 0) {
+                st_click_gp_n_hops(val);
             }
-#else
-            gpm_clear_tok(krpc_msg);
 #endif
+            gpm_clear_tok(krpc_msg);
             // TODO handle peer
             rt_insert_contact(krpc_msg, saddr, 4);
         }
@@ -339,9 +347,8 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
         break;
 
     default:
-        ERROR("Unhandled krpc method name %s (%d)",
-              get_method_name(krpc_msg->method), krpc_msg->method)
-        st_inc(ST_err_bd_handle_fallthrough);
+        ERROR("Fell through in message handle! Not OK!")
+        assert(0);
         break;
     }
 }
@@ -354,11 +361,32 @@ void init_subsystems(void) {
     VERBOSE("Initializing st...")
     st_init();
     INFO("Initialized.")
+    INFO("Rolling over stats every %d ms", STAT_ROLLOVER_FREQ_MS)
+    INFO("Heartbeat every %d rollovers", STAT_HB_EVERY)
+    INFO("Control parameters:")
+#ifdef CTL_PPS_TARGET
+    INFO("\ttarget ping rate: %.2f", CTL_PPS_TARGET);
+#endif
+    INFO("\tget peers timtout: %d ms", CTL_GPM_TIMEOUT_MS);
+#ifdef MSG_CLOSE_SID
+    INFO("Configured with MSG_CLOSE_SID: matching nids to 4 bytes.")
+#endif
+#ifdef RT_BIG
+    INFO("Configured with RT_BIG: using depth-three routing table.")
+#endif
+#ifdef STAT_CSV
+    INFO("Configured with STAT_CSV: saving counter stats to " STAT_CSV_FN)
+    INFO("\tWriting to csv every %d rollovers", STAT_CSV_EVERY)
+#ifdef STAT_AUX
+    INFO("\tConfigrued with STAT_AUX: gathering auxiliary runtime statistics")
+    INFO("\t\tWriting auxiliary stats to " STAT_CSV_FN)
+#endif // STAT_AUX
+#endif // STAT_CSV
 }
 
 void loop_statgather_cb(uv_timer_t *timer) {
     st_rollover();
-    VERBOSE("Rolled over stats.")
+    DEBUG("Rolled over stats.")
 }
 
 void loop_bootstrap_cb(uv_timer_t *timer) {

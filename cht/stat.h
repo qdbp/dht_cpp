@@ -9,16 +9,22 @@
 #define STAT_CSV_FN "./data/stat.csv"
 #endif
 
-#ifndef STAT_CSV_FN
-#define STAT_DKAD_FN "./data/dkad.csv"
+#ifndef STAT_AUX_FN
+#define STAT_AUX_FN "./data/stat_aux.csv"
 #endif
 
 #ifndef STAT_ROLLOVER_FREQ_MS
 #define STAT_ROLLOVER_FREQ_MS 1000
 #endif
 
+// Save the csv data every X rollovers
 #ifndef STAT_CSV_EVERY
 #define STAT_CSV_EVERY 5
+#endif
+
+// Print a heartbeat message ever X rollovers
+#ifndef STAT_HB_EVERY
+#define STAT_HB_EVERY 60
 #endif
 
 #define FORSTAT(X)                                                             \
@@ -29,9 +35,8 @@
     X(ctl_n_gpm_bufs)                                                          \
     X(ctl_ping_thresh)                                                         \
     /* received message statistics */                                          \
+    X(rx_err)                                                                  \
     X(rx_tot)                                                                  \
-    X(rx_oserr)                                                                \
-    X(rx_err_received)                                                         \
     X(rx_q_ap)                                                                 \
     X(rx_q_fn)                                                                 \
     X(rx_q_pg)                                                                 \
@@ -39,17 +44,15 @@
     X(rx_r_ap)                                                                 \
     X(rx_r_fn)                                                                 \
     X(rx_r_gp)                                                                 \
-    X(rx_r_pg)                                                                 \
     X(rx_r_gp_nodes)                                                           \
     X(rx_r_gp_values)                                                          \
+    X(rx_r_pg)                                                                 \
     /* transmitted message statistics */                                       \
-    X(tx_tot)                                                                  \
-    X(tx_exc)                                                                  \
     X(tx_msg_drop_overflow)                                                    \
     X(tx_msg_drop_early_error)                                                 \
     X(tx_msg_drop_late_error)                                                  \
     X(tx_msg_drop_bad_addr)                                                    \
-    X(tx_q_ap)                                                                 \
+    X(tx_tot)                                                                  \
     X(tx_q_fn)                                                                 \
     X(tx_q_pg)                                                                 \
     X(tx_q_gp)                                                                 \
@@ -75,8 +78,7 @@
     X(gpm_ih_drop_buf_overflow)                                                \
     X(gpm_ih_drop_too_many_hops)                                               \
     X(gpm_ih_inserted)                                                         \
-    X(gpm_r_gp_lookup_empty)                                                   \
-    X(gpm_r_gp_bad_checksum)                                                   \
+    X(gpm_r_gp_lookup_failed)                                                  \
     X(db_update_peers)                                                         \
     X(db_rows_inserted)                                                        \
     /* infohash lookup cycle statistics... mind these well */                  \
@@ -107,7 +109,9 @@
     X(bd_y_vals_wo_token)                                                      \
     /* Z: the message is valid, but is suspicious or uninteresting to us */    \
     X(bd_z_tok_too_long)                                                       \
-    X(bd_z_tok_unrecognized)                                                   \
+    X(bd_z_bad_tok_fn)                                                         \
+    X(bd_z_bad_tok_gp)                                                         \
+    X(bd_z_bad_tok_pg)                                                         \
     X(bd_z_token_too_long)                                                     \
     X(bd_z_token_unrecognized)                                                 \
     X(bd_z_naked_value)                                                        \

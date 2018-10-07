@@ -26,13 +26,12 @@
 #define PNODE_LEN (NIH_LEN + PEERINFO_LEN)
 
 // our key values
-#define OUR_TOK "\x77"
+#define OUR_TOK_PG "\x77"
+#define OUR_TOK_GP "\x78"
+#define OUR_TOK_FN "\x79"
 #define OUR_TOKEN "\x88"
 
 #define DB_FN "./data/dht.db"
-#define RT_FN "./data/rt.dat"
-#define RT_QUAL_FN "./data/rt_qual.dat"
-#define INFO_FILE "./live_info.txt"
 
 typedef union nih_u {
     char raw[NIH_LEN];

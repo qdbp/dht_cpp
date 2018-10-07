@@ -57,4 +57,6 @@ bool gpm_extract_tok(gpm_next_hop_t *restrict, const parsed_msg *krpc);
 /// the same nid.
 void gpm_clear_tok(const parsed_msg *krpc);
 
+i32 gpm_get_tok_hops(const parsed_msg *krpc);
+
 #endif

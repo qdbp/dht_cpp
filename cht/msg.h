@@ -6,6 +6,12 @@
 #include "dht.h"
 #include "rt.h"
 
+#ifndef MSG_CLOSE_SID
+#define SID4 "\x0"
+#else
+#define SID4 "\xff"
+#endif
+
 #define MSG_BUF_LEN 512
 
 u32 msg_q_gp(char *restrict buf, const nih_t nid, const nih_t ih, u16 tok);

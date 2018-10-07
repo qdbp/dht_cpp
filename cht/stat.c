@@ -3,6 +3,7 @@
 #include "gpmap.h"
 #include "log.h"
 #include "stat.h"
+#include <assert.h>
 #include <errno.h>
 #include <time.h>
 
@@ -17,7 +18,7 @@ const char *stat_names[] = {FORSTAT(AS_STR)};
     fclose(f);                                                                 \
     }                                                                          \
     else {                                                                     \
-        fprintf(stderr, "%s: %s", (errmsg), strerror(errno));                  \
+        ERROR("%s: %s", (errmsg), strerror(errno));                            \
     }
 
 static u64 g_ctr[ST__ST_ENUM_END] = {0};
@@ -33,7 +34,7 @@ struct timespec __st_now = {0};
 
 #ifdef STAT_AUX
 static u64 g_dkad_ctr[161] = {0};
-static u64 g_n_hops_ctr[GP_MAX_HOPS] = {0};
+static u64 g_n_hops_ctr[GP_MAX_HOPS + 1] = {0};
 #endif
 
 void st_init() {
@@ -48,7 +49,20 @@ void st_init() {
         fprintf(csv, "\n");
     }
     ENDWITH(csv, "Could not open CSV " STAT_CSV_FN " for writing")
-#endif
+#ifdef STAT_AUX
+    WITH_FILE(csv_aux, STAT_AUX_FN, "w") {
+
+        for (int ix = 0; ix <= 160; ix++) {
+            fprintf(csv_aux, "dkad_%d,", ix);
+        }
+        for (int ix = 0; ix <= GP_MAX_HOPS; ix++) {
+            fprintf(csv_aux, "gp_hops_%d,", ix);
+        }
+        fprintf(csv_aux, "\n");
+    }
+    ENDWITH(csv_aux, "Could not open aux CSV " STAT_AUX_FN " for writing")
+#endif // STAT_AUX
+#endif // STAT_CSV
 }
 
 inline void st_inc(stat_t stat) {
@@ -77,7 +91,7 @@ inline void st_click_dkad(u8 dkad) {
 
 inline void st_click_gp_n_hops(u8 n_hops) {
 #ifdef STAT_AUX
-    assert(n_hops < GP_MAX_HOPS);
+    assert(n_hops < sizeof(g_n_hops_ctr));
     g_n_hops_ctr[n_hops]++;
 #endif
 }
@@ -92,6 +106,7 @@ inline u64 st_get_old(stat_t stat) {
 
 void st_rollover(void) {
     static int write_csv = 0;
+    static int next_heartbeat = 0;
 
     ROLLOVER_TIME()
     ctl_rollover_hook();
@@ -99,13 +114,21 @@ void st_rollover(void) {
         g_ctr_old[ix] = g_ctr[ix];
     };
 
+    if (next_heartbeat != STAT_HB_EVERY - 1) {
+        next_heartbeat++;
+    } else {
+        INFO("Heartbeat: %010lu pkts sent, %010lu pkts rcvd", g_ctr[ST_tx_tot],
+             g_ctr[ST_rx_tot]);
+        next_heartbeat = 0;
+    }
+
     if (write_csv != STAT_CSV_EVERY - 1) {
         write_csv++;
         return;
     }
 
     write_csv = 0;
-    DEBUG("Writing CSV")
+    VERBOSE("Writing CSV")
 
 #ifdef STAT_CSV
     WITH_FILE(csv, STAT_CSV_FN, "a") {
@@ -117,18 +140,20 @@ void st_rollover(void) {
         fprintf(csv, "\n");
     }
     ENDWITH(csv, "Could not open " STAT_CSV_FN " for appending")
-#ifdef STAT_AUX
-    WITH_FILE(csv, STAT_AUX_FN, "w") {
 
+#ifdef STAT_AUX
+    WITH_FILE(csv_aux, STAT_AUX_FN, "a") {
+        // dkad statistics
         for (int ix = 0; ix <= 160; ix++) {
-            fprintf(csv, "%d,", ix);
+            fprintf(csv_aux, "%lu,", g_dkad_ctr[ix]);
         }
-        fprintf(csv, "\n");
-        for (int ix = 0; ix <= 160; ix++) {
-            fprintf(csv, "%d,", g_dkad_ctr[ix]);
+        // hop statistics
+        for (int ix = 0; ix < GP_MAX_HOPS; ix++) {
+            fprintf(csv_aux, "%lu,", g_n_hops_ctr[ix]);
         }
+        fprintf(csv_aux, "\n");
     }
-    ENDWITH(csv, "Could not open CSV " STAT_AUX_FN " for writing")
+    ENDWITH(csv_aux, "Could not open CSV " STAT_AUX_FN " for writing")
 #endif // STAT_AUX
 #endif // STAT_CSV
 }

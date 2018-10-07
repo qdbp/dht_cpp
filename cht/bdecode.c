@@ -68,8 +68,7 @@ typedef enum xdec_st_e {
 static inline u32 krpc_bdecode_atoi(const char *buf, u32 *restrict ix,
                                     u32 maxlen, bd_state *restrict state) {
     /*
-    Decode strictly nonnegative, colon or 'e' terminated decimal integers.
-    Fast.
+    Decode strictly nonnegative, colon or 'e' terminated bencoded integers.
 
     buf[*ix] must point to the first actual digit on the number.
 
@@ -105,7 +104,6 @@ static inline u32 krpc_bdecode_atoi(const char *buf, u32 *restrict ix,
         case '9':
             out = 10 * out + (val - 0x30);
             continue;
-            // no break;
         case 'e':
         case ':':
             state->fail = ST_bd_a_no_error;
@@ -115,7 +113,7 @@ static inline u32 krpc_bdecode_atoi(const char *buf, u32 *restrict ix,
             return -1;
         }
     }
-    // Overflows should be their own error, but it really doesn't matter
+    // int overflows should be their own error, but it really doesn't matter
     // since they're not common... just as long as they don't kill us...
     return ST_bd_x_msg_too_long;
 }
@@ -123,9 +121,8 @@ static inline u32 krpc_bdecode_atoi(const char *buf, u32 *restrict ix,
 inline stat_t xdecode(const char *data, u32 data_len,
                       parsed_msg *restrict out) {
     // Invariant 0: this function is never fast enough.
-    if (data_len > BD_MAXLEN) {
-        return ST_bd_x_msg_too_long;
-    }
+
+    assert(data_len <= BD_MAXLEN);
 
     TRACE("BEGIN XDECODE")
 
@@ -203,11 +200,7 @@ inline stat_t xdecode(const char *data, u32 data_len,
                     }
                     out->ap_port = (u16)dec_int;
                 }
-                if (xd_state == XD_OVAL) {
-                    xd_state = XD_OKEY;
-                } else {
-                    xd_state = XD_IKEY;
-                }
+                xd_state = (xd_state == XD_OVAL) ? XD_OKEY : XD_IKEY;
                 continue;
             case XD_START:
                 XD_FAIL(ST_bd_z_naked_value);
@@ -407,7 +400,7 @@ inline stat_t xdecode(const char *data, u32 data_len,
                 assert(0);
 
             case XD_OVAL:
-                TRACE(">>> reading OVAL")
+                TRACE(">>> reading OVAL, OKEY is %d", bd_st.current_key)
                 xd_state = XD_OKEY;
                 switch (bd_st.current_key) { // OVAL
                 // set the query type, if one is found...
@@ -442,7 +435,7 @@ inline stat_t xdecode(const char *data, u32 data_len,
                     xd_bad_q:
                         XD_FAIL(ST_bd_z_unknown_query);
                     }
-                // set the token
+                // set the tok
                 case BD_OKEY_T:
                     if (slen > BD_MAXLEN_TOK) {
                         XD_FAIL(ST_bd_z_tok_too_long)
@@ -471,8 +464,6 @@ inline stat_t xdecode(const char *data, u32 data_len,
                     } else {
                         XD_FAIL(ST_bd_z_unknown_type)
                     }
-                // ignore other cases
-                // TODO add better logic?
                 default:
                     TRACE("??? ignoring oval")
                     continue;
@@ -548,19 +539,15 @@ inline stat_t xdecode(const char *data, u32 data_len,
                 if (bd_st.current_key != BD_IKEY_VALUES) {
                     XD_FAIL(ST_bd_z_unexpected_list);
                 }
-                // we are in a values list, but we read a weird
-                // string NOTE we assume the entire message is
-                // corrupted and bail out, parsing very
-                // conservatively is the key to sanity
+                // conservatively bail out if we get a bad length peer
                 if (slen != PEERINFO_LEN) {
                     XD_FAIL(ST_bd_y_bad_length_peer)
                 }
                 if (out->n_peers < BD_MAX_PEERS) {
                     memcpy(out->peers[out->n_peers].packed, data + start,
                            PEERINFO_LEN);
+                    out->n_peers += 1;
                 }
-                out->n_peers += 1;
-
                 TRACE("!!! VALUES[%lu]", slen / PEERINFO_LEN)
                 continue;
 
@@ -578,11 +565,10 @@ inline stat_t xdecode(const char *data, u32 data_len,
         assert(0);
     }
 
+// MESSAGE SANITY FILTERING
 xd_validate:
 
-    // MESSAGE SANITY FILTERING
     // ALL messages need a NID...
-
     if (!(bd_st.seen_keys & BD_IKEY_NID)) {
         return ST_bd_y_no_nid;
     }
@@ -595,7 +581,8 @@ xd_validate:
     TRACE("??? DECIDING: [keys = %u] [methods = %u]", bd_st.seen_keys,
           bd_st.msg_kind);
 
-    // METHOD RESOLUTION
+    assert(!(bd_st.msg_kind & Q_ANY && bd_st.msg_kind & R_ANY));
+
     // exact APs and GPs need an info_hash only
     if (bd_st.msg_kind & Q_ANY) {
         TRACE("??? DECIDING as query")
@@ -610,7 +597,7 @@ xd_validate:
             }
 #ifndef BD_NOFILTER_AP
             else if (bd_st.msg_kind == MSG_Q_AP &&
-                     !(out->tok_len != 1 && out->token[0] == OUR_TOKEN[0])) {
+                     !(out->token_len != 1 && out->token[0] == OUR_TOKEN[0])) {
                 TRACE("=== REJECT q_ap && unrecognized token")
                 return ST_bd_z_token_unrecognized;
             }
@@ -646,21 +633,28 @@ xd_validate:
     } else if (bd_st.msg_kind & R_ANY) {
         TRACE("??? DECIDING as reply")
         // This check could be made tighter... probably not worth it...
-        if (!((out->tok_len == 1 && out->tok[0] == OUR_TOK[0]) ||
-              (out->tok_len == 3 && out->tok[2] == OUR_TOK[0]))) {
-            TRACE("=== REJECT reply && not our tok")
-            return ST_bd_z_tok_unrecognized;
-        }
+        // if (!((out->tok_len == 1 && out->tok[0] == OUR_TOK[0]) ||
+        //       (out->tok_len == 3 && out->tok[2] == OUR_TOK[0]))) {
+        //     TRACE("=== REJECT reply && not our tok")
+        //     return ST_bd_z_tok_unrecognized;
+        // }
+
         // TOKEN and (VALUES or NODES) <-> R_GP
         if ((bd_st.seen_keys & BD_IKEY_TOKEN) &&
             bd_st.seen_keys & (BD_IKEY_VALUES | BD_IKEY_NODES)) {
             TRACE("??? DECIDING as R_GP")
             out->method = MSG_R_GP;
 
+            if (out->tok_len != 3 || out->tok[2] != OUR_TOK_GP[0]) {
+                TRACE("=== REJECT r_gp && not our gp tok")
+                return ST_bd_z_bad_tok_gp;
+            }
+
             if (out->n_nodes + out->n_peers == 0) {
                 TRACE("=== REJECT r_gp && (n + v) == 0")
                 return ST_bd_y_empty_gp_response;
             }
+
             TRACE("=== ACCEPT token && (nodes | values) -> MSG_R_GP")
         }
         // VALUES and ~TOKEN <-> bad R_GP
@@ -671,6 +665,12 @@ xd_validate:
         }
         //~TOKEN and ~VALUES and NODES <->R_FN
         else if (bd_st.seen_keys & BD_IKEY_NODES) {
+
+            if (out->tok_len != 1 || out->tok[0] != OUR_TOK_FN[0]) {
+                TRACE("=== REJECT r_fn && not our fn tok")
+                return ST_bd_z_bad_tok_fn;
+            }
+
             TRACE("=== ACCEPT ~token && ~values && nodes -> MSG_R_FN")
             out->method = MSG_R_FN;
         }
@@ -680,6 +680,10 @@ xd_validate:
                 TRACE("=== REJECT (body - tok) && ~(nodes || values) -> "
                       "bad r_pg")
                 return ST_bd_z_ping_body;
+            }
+            if (out->tok_len != 1 || out->tok[0] != OUR_TOK_PG[0]) {
+                TRACE("=== REJECT r_pg && not our pg tok")
+                return ST_bd_z_bad_tok_pg;
             }
             TRACE("=== ACCEPT ~(values | nodes) -> MSG_R_PG")
             out->method = MSG_R_PG;

@@ -2,8 +2,10 @@
 #ifndef DHT_CTL_H
 #define DHT_CTL_H
 
-#ifndef CTL_PPS_TARGET
-#define CTL_PPS_TARGET 1000.0
+/// CTL_PPS_TARGET: float, sets the ping per second target
+
+#ifndef CTL_GPM_TIMEOUT
+#define CTL_GPM_TIMEOUT_MS 175
 #endif
 
 #include "bdecode.h"

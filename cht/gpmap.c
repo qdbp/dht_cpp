@@ -1,3 +1,4 @@
+#include "ctl.h"
 #include "gpmap.h"
 #include "log.h"
 #include "stat.h"
@@ -16,7 +17,6 @@ static u64 now_ms;
 #define MAX_USED (7 * (N_BINS >> 3))
 
 #define IFL_BIN_SIZE 64
-#define IFL_EXPIRE_MS 200
 
 typedef struct gpm_ih_status {
     nih_t ih;              // The infohash being tracked
@@ -65,6 +65,19 @@ static inline void set_ih_status(u16 tok, const nih_t nid, const nih_t ih,
     cell->hop_ctr = hop;
 
     set_cell(cell);
+}
+
+inline static gpm_ih_status_t *gpm_lookup_tok(const parsed_msg *krpc) {
+    assert(krpc->tok_len == 3);
+
+    u16 tok = *(u16 *)(krpc->tok);
+    gpm_ih_status_t *cell = &g_ifl_buf[tok];
+
+    if (!(cell->is_set) || cell->last_nid_checksum != krpc->nid.checksum) {
+        return NULL;
+    }
+
+    return cell;
 }
 
 // Writes up to MAX_GP_PNODES nodes to the next hop structure; could be less,
@@ -132,7 +145,8 @@ bool get_vacant_tok(u16 *dst) {
     for (int ctr = 0; ctr < N_BINS; ctr++) {
         cell = &g_ifl_buf[ix];
 
-        if (cell->is_set && (now_ms - cell->last_reponse_ms > IFL_EXPIRE_MS)) {
+        if (cell->is_set &&
+            (now_ms - cell->last_reponse_ms > CTL_GPM_TIMEOUT_MS)) {
             unset_cell(cell);
             *dst = ix;
             return true;
@@ -155,7 +169,7 @@ bool gpm_decide_pursue_q_gp_ih(u16 *restrict assign_tok,
     if (get_vacant_tok(assign_tok)) {
         return true;
     } else {
-        st_inc_debug(ST_gpm_ih_drop_buf_overflow);
+        st_inc(ST_gpm_ih_drop_buf_overflow);
         return false;
     }
 }
@@ -173,16 +187,11 @@ bool gpm_extract_tok(gpm_next_hop_t *restrict next_hop,
                      const parsed_msg *krpc) {
 
     assert(krpc->n_nodes > 0);
-    assert(krpc->tok_len == 3);
 
-    u16 tok = *(u16 *)(krpc->tok);
-    gpm_ih_status_t *cell = &g_ifl_buf[tok];
+    gpm_ih_status_t *cell = gpm_lookup_tok(krpc);
 
-    if (!cell->is_set) {
-        st_inc(ST_gpm_r_gp_lookup_empty);
-        return false;
-    } else if (cell->last_nid_checksum != krpc->nid.checksum) {
-        st_inc(ST_gpm_r_gp_bad_checksum);
+    if (!cell) {
+        st_inc(ST_gpm_r_gp_lookup_failed);
         return false;
     }
 
@@ -199,8 +208,16 @@ bool gpm_extract_tok(gpm_next_hop_t *restrict next_hop,
 };
 
 void gpm_clear_tok(const parsed_msg *krpc) {
-    gpm_ih_status_t *cell = &g_ifl_buf[*(u16 *)krpc->tok];
-    if (cell->last_nid_checksum == krpc->nid.checksum) {
+    gpm_ih_status_t *cell = gpm_lookup_tok(krpc);
+    if (cell) {
         unset_cell(cell);
     }
+}
+
+i32 gpm_get_tok_hops(const parsed_msg *krpc) {
+    gpm_ih_status_t *cell = gpm_lookup_tok(krpc);
+    if (cell) {
+        return cell->hop_ctr;
+    }
+    return -1;
 }

@@ -17,6 +17,7 @@ inline bool ctl_decide_ping(nih_t nid) {
 
 void ctl_rollover_hook(void) {
     // Calibrate ping rate
+#ifdef CTL_PPS_TARGET
     double ping_rate = RATE(ST_tx_q_pg);
     u64 cur_thresh = st_get(ST_ctl_ping_thresh);
 
@@ -27,4 +28,5 @@ void ctl_rollover_hook(void) {
         cur_thresh += delta;
     }
     st_set(ST_ctl_ping_thresh, cur_thresh);
+#endif
 }

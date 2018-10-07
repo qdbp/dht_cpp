@@ -31,7 +31,7 @@ static void load_rt() {
         exit(-1);
     }
 
-    u64 want_size = RT_TOTAL_CONTACTS * sizeof(rt_nodeinfo_t);
+    u64 want_size = RT_SIZE * sizeof(rt_nodeinfo_t);
 
     if (info.st_size != want_size) {
         WARN("Bad size (%ld) rt file found.", info.st_size)
@@ -124,8 +124,9 @@ static inline rt_nodeinfo_t *rt_get_cell(const nih_t nid) {
     */
 #ifdef RT_BIG
     return rt_get_cell_by_coords(nid.a, nid.b, nid.c);
-#endif
+#else
     return rt_get_cell_by_coords(nid.a, nid.b);
+#endif
 }
 
 static inline void rt__set_from_addr(rt_nodeinfo_t *cell, const nih_t nid,
@@ -220,12 +221,12 @@ rt_nodeinfo_t *rt_get_random_valid_node() {
     /*
         Returns a random non-zero, valid node from the current routing table.
 
-        Is much slower when the table is empty. Returns None if it can
+        Is much slower when the table is sparse. Returns None if it can
         find no node at all.
         */
 
-    u32 start = randint(0, RT_TOTAL_CONTACTS);
-    u32 end = RT_TOTAL_CONTACTS;
+    u32 start = randint(0, RT_SIZE);
+    u32 end = RT_SIZE;
 
     while (start > 0) {
         for (int ix = start; ix < end; ix++) {
