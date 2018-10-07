@@ -5,6 +5,7 @@
 #include "log.h"
 #include "msg.h"
 #include "rt.h"
+#include "spamfilter.h"
 #include "util.h"
 #include <assert.h>
 #include <stdio.h>
@@ -121,6 +122,11 @@ static void cb_recv_msg(uv_udp_t *handle, ssize_t nread, const uv_buf_t *rcvbuf,
 
     if (nread < MIN_MSG_LEN) {
         st_inc(ST_bm_too_short);
+        return;
+    }
+
+    if (!spam_check_rx((const struct sockaddr_in *)saddr)) {
+        st_inc(ST_rx_spam);
         return;
     }
 

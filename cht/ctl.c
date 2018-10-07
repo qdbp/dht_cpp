@@ -7,26 +7,16 @@
 
 // PUBLIC FUNCTIONS
 
+static u8 ctl_ping_window = 0;
+
 void ctl_init(void) {
-    st_set(ST_ctl_ping_thresh, 0);
 }
 
 inline bool ctl_decide_ping(nih_t nid) {
-    return nid.ctl_byte >= st_get(ST_ctl_ping_thresh);
+    return true;
+    // return (nid.ctl_byte & 0xf0) == (ctl_ping_window & 0xf0);
 }
 
 void ctl_rollover_hook(void) {
-    // Calibrate ping rate
-#ifdef CTL_PPS_TARGET
-    double ping_rate = RATE(ST_tx_q_pg);
-    u64 cur_thresh = st_get(ST_ctl_ping_thresh);
-
-    u8 delta = cur_thresh > 230 ? 1 : 5;
-    if (ping_rate < CTL_PPS_TARGET) {
-        cur_thresh = delta <= cur_thresh ? cur_thresh - delta : 0;
-    } else {
-        cur_thresh += delta;
-    }
-    st_set(ST_ctl_ping_thresh, cur_thresh);
-#endif
+    ctl_ping_window++;
 }

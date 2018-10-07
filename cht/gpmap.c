@@ -71,7 +71,7 @@ inline static gpm_ih_status_t *gpm_lookup_tok(const parsed_msg *krpc) {
     assert(krpc->tok_len == 3);
 
     u16 tok = *(u16 *)(krpc->tok);
-    gpm_ih_status_t *cell = &g_ifl_buf[tok];
+    gpm_ih_status_t *cell = &(g_ifl_buf[tok]);
 
     if (!(cell->is_set) || cell->last_nid_checksum != krpc->nid.checksum) {
         return NULL;

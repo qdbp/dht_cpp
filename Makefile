@@ -2,10 +2,11 @@ C = /usr/bin/clang
 CPP = /usr/bin/clang++
 GCC = /usr/bin/gcc
 FAST = -march=native -Ofast -flto -finline-functions
-CFLAGS = -DSTAT_CSV -Wall -Werror -luv
-CPPFLAGS = -DSTAT_CSV -Wall -Werror -luv
+CFLAGS = -Wall -Werror -luv
+CPPFLAGS = -Wall -Werror -luv
 
 CFG = \
+	-DSTAT_CSV \
 	-DLOGLEVEL=LVL_INFO \
 	-DMSG_CLOSE_SID \
 	-DSTAT_AUX \

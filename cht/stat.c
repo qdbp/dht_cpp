@@ -2,6 +2,7 @@
 #include "dht.h"
 #include "gpmap.h"
 #include "log.h"
+#include "spamfilter.h"
 #include "stat.h"
 #include <assert.h>
 #include <errno.h>
@@ -107,6 +108,9 @@ inline u64 st_get_old(stat_t stat) {
 void st_rollover(void) {
     static int write_csv = 0;
     static int next_heartbeat = 0;
+
+    // TODO move to own uv loop
+    spam_run_epoch();
 
     ROLLOVER_TIME()
     ctl_rollover_hook();

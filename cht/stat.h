@@ -33,9 +33,11 @@
     X(ctl_n_recv_bufs)                                                         \
     X(ctl_n_send_bufs)                                                         \
     X(ctl_n_gpm_bufs)                                                          \
-    X(ctl_ping_thresh)                                                         \
+    X(ctl_ping_window)                                                         \
+    X(spam_free)                                                               \
     /* received message statistics */                                          \
     X(rx_err)                                                                  \
+    X(rx_spam)                                                                 \
     X(rx_tot)                                                                  \
     X(rx_q_ap)                                                                 \
     X(rx_q_fn)                                                                 \
