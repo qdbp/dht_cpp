@@ -8,8 +8,8 @@ CPPFLAGS = -Wall -Werror -luv
 CFG = \
 	-DSTAT_CSV \
 	-DLOGLEVEL=LVL_INFO \
-	-DMSG_CLOSE_SID \
 	-DSTAT_AUX \
+	-DMSG_CLOSE_SID \
 #	-DBD_TRACE
 
 .PHONY: rtdump callgrind

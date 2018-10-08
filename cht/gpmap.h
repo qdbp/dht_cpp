@@ -5,7 +5,9 @@
 // The GetPeersManager engine
 
 // number of nodes to pursue from each get_peers nodes array
-#define MAX_GP_PNODES 2
+#ifndef MAX_GP_NODES
+#define MAX_GP_PNODES 3
+#endif
 // dkads lower than this are overwhelmingly improbable, so we ignore any
 // nodes like this.
 #define BULLSHIT_DKAD 100
