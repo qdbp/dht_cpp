@@ -34,7 +34,8 @@
     X(ctl_n_send_bufs)                                                         \
     X(ctl_n_gpm_bufs)                                                          \
     X(ctl_ping_window)                                                         \
-    X(spam_free)                                                               \
+    X(spam_size_ping)                                                          \
+    X(spam_size_rx)                                                            \
     /* received message statistics */                                          \
     X(rx_err)                                                                  \
     X(rx_spam)                                                                 \
@@ -55,6 +56,8 @@
     X(tx_msg_drop_late_error)                                                  \
     X(tx_msg_drop_bad_addr)                                                    \
     X(tx_tot)                                                                  \
+    X(tx_ping_drop_spam) /* we don't want to spam either! */                   \
+    X(tx_ping_drop_ctl)  /* we don't want to spam either! */                   \
     X(tx_q_fn)                                                                 \
     X(tx_q_pg)                                                                 \
     X(tx_q_gp)                                                                 \
@@ -145,6 +148,7 @@ typedef enum stat_t { FORSTAT(AS_ENUM) } stat_t;
 extern const char *stat_names[];
 
 void st_inc(stat_t);
+void st_dec(stat_t);
 void st_inc_debug(stat_t);
 void st_add(stat_t, u32);
 void st_set(stat_t, u64);

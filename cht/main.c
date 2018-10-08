@@ -21,6 +21,7 @@
     }
 
 #define DEFAULT_QUAL 1
+#define AS_SIN(x) ((const struct sockaddr_in *)(x))
 
 #define N_RECV 1024
 #define N_SEND 1024
@@ -125,7 +126,7 @@ static void cb_recv_msg(uv_udp_t *handle, ssize_t nread, const uv_buf_t *rcvbuf,
         return;
     }
 
-    if (!spam_check_rx((const struct sockaddr_in *)saddr)) {
+    if (!spam_check_rx(AS_SIN(saddr)->sin_addr.s_addr)) {
         st_inc(ST_rx_spam);
         return;
     }
@@ -139,7 +140,7 @@ static void cb_recv_msg(uv_udp_t *handle, ssize_t nread, const uv_buf_t *rcvbuf,
     }
 
     st_inc(ST_rx_tot);
-    handle_msg(&rcvd, (const struct sockaddr_in *)saddr);
+    handle_msg(&rcvd, AS_SIN(saddr));
 }
 
 static void cb_send_msg(uv_udp_send_t *req, int status) {
@@ -214,10 +215,13 @@ void ping_sweep_nodes(const parsed_msg *krpc_msg) {
 
     for (int ix = 0; ix < krpc_msg->n_nodes; ix++) {
         if (!ctl_decide_ping(krpc_msg->nodes[ix].nid)) {
-            continue;
+            st_inc(ST_tx_ping_drop_ctl);
+        } else if (!spam_check_tx_ping(krpc_msg->nodes[ix].peerinfo.in_addr)) {
+            st_inc(ST_tx_ping_drop_spam);
+        } else {
+            len = msg_q_pg(ping, krpc_msg->nodes[ix].nid);
+            send_to_pnode(ping, len, krpc_msg->nodes[ix], ST_tx_q_pg);
         }
-        len = msg_q_pg(ping, krpc_msg->nodes[ix].nid);
-        send_to_pnode(ping, len, krpc_msg->nodes[ix], ST_tx_q_pg);
     }
 }
 
@@ -267,7 +271,7 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
         // reply to the sender node
         node = rt_get_neighbor_contact(krpc_msg->nid);
         if (node != NULL) {
-            len = msg_r_fn(reply, krpc_msg, node->pnode);
+            len = msg_r_gp(reply, krpc_msg, node->pnode);
             send_msg(reply, len, saddr, ST_tx_r_gp);
         }
         rt_insert_contact(krpc_msg, saddr, 1);
@@ -375,7 +379,7 @@ void init_subsystems(void) {
 #ifdef CTL_PPS_TARGET
     INFO("\ttarget ping rate: %.2f", CTL_PPS_TARGET);
 #endif
-    INFO("\tget peers timtout: %d ms", CTL_GPM_TIMEOUT_MS);
+    INFO("\tget peers timeout: %d ms", CTL_GPM_TIMEOUT_MS);
 #ifdef MSG_CLOSE_SID
     INFO("Configured with MSG_CLOSE_SID: matching nids to 4 bytes.")
 #endif
@@ -440,7 +444,7 @@ int main(int argc, char *argv[]) {
     // INIT BOOTSTRAP
     status = uv_timer_init(main_loop, &g_bootstrap_timer);
     CHECK(status, "bootstrap timer init");
-    status = uv_timer_start(&g_bootstrap_timer, &loop_bootstrap_cb, 100, 100);
+    status = uv_timer_start(&g_bootstrap_timer, &loop_bootstrap_cb, 100, 500);
 
     CHECK(status, "boostrap start")
 

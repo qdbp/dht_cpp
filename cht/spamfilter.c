@@ -2,78 +2,157 @@
 #include "log.h"
 #include "spamfilter.h"
 #include "stat.h"
+#include <assert.h>
 #include <stdlib.h>
 
 #define SPAM_TABLE_SIZE 256
-#define SPAM_MAX_TOKENS 5
-
-_Static_assert(SPAM_MAX_TOKENS > 1, "bad max tokens");
-_Static_assert(SPAM_MAX_TOKENS < UINT8_MAX - 1, "bad max tokens");
+#define SPAM_RX_MAX_TOKENS 10
+#define SPAM_PING_MAX_TOKENS 15
 
 // TODO split into rx_ and tx_ tokens?
 typedef struct rateinfo_s {
-    u32 in_addr;
-    u8 n_tokens;
     struct rateinfo_s *next;
+    u32 key;
+    u8 n_tokens;
 } rateinfo_t;
 
-// mapped by the lower two bytes (in network order) of the address
-// SLL in each bucket
-rateinfo_t g_rateinfo_map[SPAM_TABLE_SIZE] = {{0}};
+rateinfo_t g_spam_rx_map[SPAM_TABLE_SIZE] = {{0}};
+rateinfo_t g_spam_ping_map[SPAM_TABLE_SIZE] = {{0}};
 
-static inline u8 hash_inaddr(u32 in_addr) {
-    return in_addr & 0xff;
+static inline u8 hash_key(u32 in_addr) {
+    return in_addr >> 24;
 }
 
-void spam_run_epoch(void) {
-    DEBUG("EPOCH")
-    for (int ix = 0; ix < SPAM_TABLE_SIZE; ix++) {
-        rateinfo_t *this = &(g_rateinfo_map[ix]);
-        rateinfo_t *temp;
-        u8 new_tokens;
-        while (this->next) {
-            DEBUG("NEW TOKENS")
-            new_tokens = this->next->n_tokens + 1;
-            if (new_tokens > SPAM_MAX_TOKENS) {
-                temp = this->next;
-                this->next = this->next->next;
-                DEBUG("FREE")
-                free(temp);
-                st_inc(ST_spam_free);
-            } else {
-                this->next->n_tokens = new_tokens;
-                this = this->next;
-            }
+/// Walks the linked list hash table address `table`, looking for the address
+/// entry `saddr`. If it is found, add `delta` tokens to that entry's token
+/// value. If the result would be less than or equal to zero, return false. Else
+/// replace the token value with the sum and return true. If the entry is not
+/// found, create a new entry with initial token value `max_tokens` + delta.
+/// Returns -1 if there are not enough tokens, else the remaining number of
+/// tokens.
+static inline i32 spam__transact(u32 key, rateinfo_t table[SPAM_TABLE_SIZE],
+                                 i8 delta, u8 max_tokens, stat_t acct) {
+
+    // Withdrawing more than the allowed max would always fail, we don't
+    // need a node.
+    static bool has_warned = false;
+    if (max_tokens + delta < 0) {
+        return -1;
+        if (!has_warned) {
+            WARN("Called with a widrawal %d on spam account %s with max_tokens "
+                 "%d",
+                 delta, stat_names[acct], max_tokens)
+            has_warned = true;
         }
     }
-}
 
-bool spam_check_rx(const struct sockaddr_in *saddr) {
+    u8 bucket = hash_key(key);
 
-    u8 bucket = hash_inaddr(saddr->sin_addr.s_addr);
-    rateinfo_t *this = &(g_rateinfo_map[bucket]);
-    rateinfo_t *last = this;
+    rateinfo_t *const head = &(table[bucket]);
+    rateinfo_t *last = head;
+    rateinfo_t *this = last->next;
 
-    while (this->next) {
-        if (this->next->in_addr == saddr->sin_addr.s_addr) {
-            if (this->next->n_tokens == 0) {
-                DEBUG("SPAM!")
-                return false;
-            } else {
-                this->next->n_tokens--;
-                DEBUG("DEC TO %d", this->next->n_tokens)
-                return true;
+    DEBUG("this %p; last %p; head %p; delta %d", this, last, head, delta)
+
+    while (this) {
+        if (this->key == key) {
+            assert(this->n_tokens <= max_tokens);
+            // We're out of tokens! Block the operation.
+            if (this->n_tokens + delta < 0) {
+                return -1;
+            }
+            // We have >= max tokens! Remove this node and return the max.
+            else if (this->n_tokens + delta >= max_tokens) {
+                last->next = this->next;
+                free(this);
+                st_dec(acct);
+                return max_tokens;
+            }
+            // We are "in range", do the adjustment, return the remaining
+            // tokens.
+            else {
+                this->n_tokens += delta;
+                // Rotate the node to the front
+                if (head != last) {
+                    // H->[x*]->L->T->[y*]
+                    last->next = this->next;
+                    // H->[x*]->L--->[y*] ; T->[y*]
+                    this->next = head->next;
+                    // H->[x*]->L->[y*] ; T->[x*]
+                    head->next = this;
+                    // H->T->[x*]->L->[y*]
+                }
+                return this->n_tokens;
             }
         }
         last = this;
         this = this->next;
     }
+
+    // We didn't find a node
+
+    // New nodes have max_tokens implicitly - if we would have more than that,
+    // the node would be poppable immediately; so we just do nothing.
+    if (delta >= 0) {
+        return max_tokens;
+    }
+
+    // Otherwise we insert a new node and subtract the delta to start.
     rateinfo_t *new_node = (rateinfo_t *)malloc(sizeof(rateinfo_t));
+    st_inc(acct);
 
-    new_node->next = NULL;
-    new_node->in_addr = saddr->sin_addr.s_addr;
-    new_node->n_tokens = SPAM_MAX_TOKENS - 1;
+    new_node->key = key;
+    new_node->n_tokens = max_tokens + delta;
+    // insert the node at the front
+    new_node->next = head->next;
+    head->next = new_node;
 
-    last->next = new_node;
+    return max_tokens + delta;
+}
+
+static void spam__sweep(rateinfo_t table[SPAM_TABLE_SIZE], u8 delta,
+                        u8 max_tokens, stat_t acct) {
+
+    for (int ix = 0; ix < SPAM_TABLE_SIZE; ix++) {
+        rateinfo_t *last = &(table[ix]);
+        rateinfo_t *this = last->next;
+
+        while (this) {
+            if (this->n_tokens + delta >= max_tokens) {
+                last->next = this->next;
+                free(this);
+                st_dec(acct);
+                /* last = last */
+            } else {
+                this->n_tokens += delta;
+                last = this;
+            }
+            this = last->next;
+        }
+    }
+}
+
+// PUBLIC FUNCTIONS
+
+void spam_run_epoch(void) {
+    spam__sweep(g_spam_rx_map, 1, SPAM_RX_MAX_TOKENS, ST_spam_size_rx);
+    spam__sweep(g_spam_ping_map, 1, SPAM_PING_MAX_TOKENS, ST_spam_size_ping);
+}
+
+bool spam_check_rx(u32 saddr_ip) {
+    i32 val = spam__transact(saddr_ip, g_spam_rx_map, -1, SPAM_RX_MAX_TOKENS,
+                             ST_spam_size_rx);
+    if (val < 0) {
+        return false;
+    }
+    return true;
+}
+
+bool spam_check_tx_ping(u32 saddr_ip) {
+    i32 val = spam__transact(saddr_ip, g_spam_ping_map, -15,
+                             SPAM_PING_MAX_TOKENS, ST_spam_size_ping);
+    if (val < 0) {
+        return false;
+    }
     return true;
 }

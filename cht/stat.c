@@ -70,6 +70,10 @@ inline void st_inc(stat_t stat) {
     g_ctr[stat]++;
 }
 
+inline void st_dec(stat_t stat) {
+    g_ctr[stat] = g_ctr[stat] == 0 ? 0 : g_ctr[stat] - 1;
+}
+
 inline void st_set(stat_t stat, u64 val) {
     g_ctr[stat] = val;
 }

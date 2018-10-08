@@ -56,8 +56,9 @@ def main():
     df.plot(ax=ax, y='rx_q_fn', color='orange', linestyle=':')
     df.plot(ax=ax, y='rx_q_ap', color='#bb9000', linestyle=':')
 
-    df.plot(ax=ax, y='gpm_ih_drop_buf_overflow',
-            color='red', label='gpm overflows')
+    df.plot(ax=ax, y='rx_spam', color='red', label='rx spam')
+    df.plot(ax=ax, y='tx_ping_drop_spam', color='red',
+            label='ping spam', linestyle='--')
 
     plt.legend()
     plt.gcf().set_size_inches((1920/150, 1080/150))
