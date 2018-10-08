@@ -232,6 +232,7 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
     switch (krpc_msg->method) {
     case MSG_Q_PG:
         st_inc(ST_rx_q_pg);
+
         len = msg_r_pg(reply, krpc_msg);
         send_msg(reply, len, saddr, ST_tx_r_pg);
 
@@ -241,11 +242,12 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
     case MSG_Q_FN:
         st_inc(ST_rx_q_fn);
 
-        node = rt_get_neighbor_contact(krpc_msg->nid);
-        if (node != NULL) {
+        node = rt_get_neighbor_contact(krpc_msg->target);
+        if (node) {
             len = msg_r_fn(reply, krpc_msg, node->pnode);
             send_msg(reply, len, saddr, ST_tx_r_fn);
         }
+
         rt_insert_contact(krpc_msg, saddr, 0);
         break;
 
@@ -300,6 +302,7 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
 
     case MSG_R_FN:
         st_inc(ST_rx_r_fn);
+
         if (krpc_msg->n_nodes == 0) {
             ERROR("Empty 'nodes' in R_FN")
             st_inc(ST_err_bd_empty_r_gp);
@@ -329,11 +332,10 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
             st_inc(ST_rx_r_gp_nodes);
             // TODO handle gp nodes
             ping_sweep_nodes(krpc_msg);
-
             if (gpm_extract_tok(&next_node, krpc_msg)) {
                 for (int ix = 0; ix < next_node.n_pnodes; ix++) {
                     if (!get_vacant_tok(&gp_tok)) {
-                        goto end_pnodes_iter;
+                        break;
                     }
                     len = msg_q_gp(reply, next_node.pnodes[ix].nid,
                                    next_node.ih, gp_tok);
@@ -342,9 +344,9 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
                                             next_node.ih, next_node.hop_ctr + 1,
                                             gp_tok);
                 }
-            end_pnodes_iter:;
             }
         }
+
         break;
 
     case MSG_R_PG:

@@ -13,7 +13,6 @@
 #include <unistd.h>
 
 static rt_nodeinfo_t *g_rt = NULL;
-static int g_dkad_offsets[256] = {0};
 
 // STATIC FUNCTIONS
 
@@ -185,24 +184,8 @@ rt_nodeinfo_t *rt_get_neighbor_contact(const nih_t target) {
     if (!is_pnode_empty(out_cell->pnode)) {
         return out_cell;
     }
-
-    // try one neighbor cell, then fail
-#ifdef RT_BIG
-    if (g_dkad_offsets[target.b] > 0) {
-#else
-    if (g_dkad_offsets[target.c] > 0) {
-#endif
-        out_cell = out_cell + 1;
-    } else {
-        out_cell = out_cell - 1;
-    }
-
-    if (!is_pnode_empty(out_cell->pnode)) {
-        return out_cell;
-    } else {
-        st_inc(ST_rt_miss);
-        return NULL;
-    }
+    st_inc(ST_rt_miss);
+    return NULL;
 }
 
 void rt_nuke_node(const nih_t target) {
@@ -255,11 +238,4 @@ rt_nodeinfo_t *rt_get_random_valid_node() {
 
 void rt_init(void) {
     load_rt();
-    g_dkad_offsets[0] = 1;
-    g_dkad_offsets[255] = -1;
-    for (int i = 1; i < 255; i += 1) {
-        int xm = (i - 1) ^ i;
-        int xp = (i + 1) ^ i;
-        g_dkad_offsets[i] = (xm < xp) ? -1 : 1;
-    }
 }
