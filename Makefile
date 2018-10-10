@@ -1,9 +1,10 @@
-C = /usr/bin/clang
+CC = /usr/bin/clang
 CPP = /usr/bin/clang++
 GCC = /usr/bin/gcc
 FAST = -march=native -Ofast -flto -finline-functions
-CFLAGS = -Wall -Werror -luv
-CPPFLAGS = -Wall -Werror -luv
+CFLAGS = -std=gnu17 -Wall -Werror
+CPPFLAGS = -std=gnu++17 -Wall -Werror -fno-exceptions
+LDFLAGS = -luv -flto
 
 CFG = \
 	-DSTAT_CSV \
@@ -15,10 +16,19 @@ CFG = \
 .PHONY: rtdump callgrind
 
 build:
-	$(CC) $(CFLAGS) $(FAST) $(CFG) cht/*.c -o dht_fast
+	$(CC) $(CFLAGS) $(FAST) $(CFG) -luv cht/*.c -o dht_fast
+
+build:
+	rm -rf ./build_cpp
+	mkdir build_cpp/
+	$(CC) -c $(CFLAGS) $(FAST) $(CFG) cht/*.c
+	$(CPP) -c $(CPPFLAGS) $(FAST) $(CFG) cht/*.cpp
+	mv *.o build_cpp/
+	$(CPP) $(LDFLAGS) -o dht_cpp build_cpp/*.o
+	rm -rf ./build_cpp
 
 run: build
-	./dht_fast
+	./dht_cpp
 
 build_debug:
 	$(GCC) $(CFLAGS) $(CFG) -g cht/*.c -o dht_dbg

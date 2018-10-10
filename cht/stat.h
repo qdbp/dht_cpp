@@ -35,6 +35,7 @@
     X(ctl_n_gpm_bufs)                                                          \
     X(ctl_ping_window)                                                         \
     X(spam_size_ping)                                                          \
+    X(spam_size_q_gp)                                                          \
     X(spam_size_rx)                                                            \
     /* received message statistics */                                          \
     X(rx_err)                                                                  \
@@ -61,6 +62,7 @@
     X(tx_q_fn)                                                                 \
     X(tx_q_pg)                                                                 \
     X(tx_q_gp)                                                                 \
+    X(tx_q_gp_drop_spam)                                                       \
     X(tx_r_ap)                                                                 \
     X(tx_r_fn)                                                                 \
     X(tx_r_gp)                                                                 \

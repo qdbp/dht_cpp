@@ -341,6 +341,11 @@ static void handle_msg(parsed_msg *krpc_msg, const struct sockaddr_in *saddr) {
                     if (!get_vacant_tok(&gp_tok)) {
                         break;
                     }
+                    if (!spam_check_tx_q_gp(saddr->sin_addr.s_addr,
+                                            next_node.pnodes[ix].nid)) {
+                        st_inc(ST_tx_q_gp_drop_spam);
+                        break;
+                    }
                     len = msg_q_gp(reply, next_node.pnodes[ix].nid,
                                    next_node.ih, gp_tok);
                     send_to_pnode(reply, len, next_node.pnodes[ix], ST_tx_q_gp);

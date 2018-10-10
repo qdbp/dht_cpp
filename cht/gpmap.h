@@ -6,7 +6,7 @@
 
 // number of nodes to pursue from each get_peers nodes array
 #ifndef MAX_GP_NODES
-#define MAX_GP_PNODES 3
+#define MAX_GP_PNODES BD_MAX_NODES
 #endif
 // dkads lower than this are overwhelmingly improbable, so we ignore any
 // nodes like this.

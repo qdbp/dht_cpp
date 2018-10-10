@@ -59,6 +59,8 @@ def main():
     df.plot(ax=ax, y='rx_spam', color='red', label='rx spam')
     df.plot(ax=ax, y='tx_ping_drop_spam', color='red',
             label='ping spam', linestyle='--')
+    df.plot(ax=ax, y='tx_q_gp_drop_spam', color='red',
+            label='q_gp spam', linestyle=':')
 
     plt.legend()
     plt.gcf().set_size_inches((1920/150, 1080/150))
