@@ -1,7 +1,5 @@
-// vi:ft=c
-#ifndef DHT_LOG_H
-#define DHT_LOG_H
-
+// vi:ft=cpp
+#pragma once
 #include <stdio.h>
 #include <time.h>
 
@@ -12,7 +10,7 @@
 #define LVL_ERROR 20
 
 #ifndef LOGLEVEL
-#define LOGLEVEL LVL_INFO
+#define LOGLEVEL LVL_DEBUG
 #endif
 
 extern time_t __g_log_time;
@@ -54,5 +52,3 @@ extern char __g_log_fmttime[64];
 #else
 #define ERROR(msg, ...)
 #endif
-
-#endif // DHT_LOG_H

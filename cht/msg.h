@@ -1,26 +1,31 @@
-// vi:ft=c
-#ifndef DHT_MSG_H
-#define DHT_MSG_H
+// vi:ft=cpp
+#pragma once
 
-#include "bdecode.h"
 #include "dht.h"
+#include "krpc.h"
 #include "rt.h"
+#include "stat.h"
+
+using namespace cht;
+namespace cht::msg {
 
 #ifndef MSG_CLOSE_SID
-#define SID4 "\x0"
+constexpr u8 SID4 = 0;
 #else
-#define SID4 "\xff"
+constexpr u8 SID4 = 0xff;
 #endif
 
-#define MSG_BUF_LEN 512
+#define MSG_BUF_LEN 256
 
-u32 msg_q_gp(char *restrict buf, const nih_t nid, const nih_t ih, u16 tok);
-u32 msg_q_fn(char *restrict buf, const pnode_t dest, const nih_t target);
-u32 msg_q_pg(char *restrict buf, const nih_t nid);
-u32 msg_r_fn(char *restrict buf, const parsed_msg *, const pnode_t);
-u32 msg_r_gp(char *restrict buf, const parsed_msg *, const pnode_t);
-u32 msg_r_pg(char *restrict buf, const parsed_msg *);
+static_assert(100 + bd::MAXLEN_TOK < MSG_BUF_LEN);
+
+u32 q_gp(u8 buf[], const Nih &nid, const Nih &ih, u16 tok);
+u32 q_fn(u8 buf[], const Nih &nid, const Nih &target);
+u32 q_pg(u8 buf[], const Nih &nid);
+u32 r_fn(u8 buf[], const bd::KReply &, const PNode &);
+u32 r_gp(u8 buf[], const bd::KReply &, const PNode &);
+u32 r_pg(u8 buf[], const bd::KReply &);
 
 void init_msg(void);
 
-#endif // DHT_MSG_H
+} // namespace cht::msg

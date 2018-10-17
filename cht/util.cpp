@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+using namespace cht;
+namespace cht {
 /// Generates a random integer from [mn, mx)
 u64 randint(u64 mn, u64 mx) {
     return mn + rand() / (RAND_MAX / (mx - mn) + 1);
@@ -59,7 +61,7 @@ bool is_valid_utf8(const unsigned char s[], u64 maxlen) {
 }
 
 // Maps u8 to the position of its highest set bit
-static const u8 g_dkad_tab[256] = {
+static constexpr u8 g_dkad_tab[256] = {
     0, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5,
     5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
     6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7,
@@ -73,7 +75,7 @@ static const u8 g_dkad_tab[256] = {
     8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8};
 
 /// Takes the log kademlia distance between two sha1 hashes.
-inline u8 dkad(const nih_t x, const nih_t y) {
+u8 dkad(const Nih &x, const Nih &y) {
 
     u8 z, d = 160;
 
@@ -81,10 +83,10 @@ inline u8 dkad(const nih_t x, const nih_t y) {
         z = x.raw[i] ^ y.raw[i];
         if (z == 0) {
             d -= 8;
-            continue;
         } else {
             return d - g_dkad_tab[z];
         }
     }
     return 0;
 }
+} // namespace cht

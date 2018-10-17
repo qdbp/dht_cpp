@@ -1,10 +1,9 @@
-// vi:ft=c
-#ifndef DHT_DHT_H
-#define DHT_DHT_H
+#pragma once
 
-#include "cppcompat.h"
+#include <locale>
 #include <stdint.h>
-#include <string.h>
+
+namespace cht {
 
 #define u8 uint8_t
 #define u16 uint16_t
@@ -27,50 +26,59 @@
 #define PNODE_LEN (NIH_LEN + PEERINFO_LEN)
 
 // our key values
-#define OUR_TOK_PG "\x77"
-#define OUR_TOK_GP "\x78"
-#define OUR_TOK_FN "\x79"
-#define OUR_TOKEN "\x88"
+constexpr u8 OUR_TOK_PG = 0x77;
+constexpr u8 OUR_TOK_GP = 0x78;
+constexpr u8 OUR_TOK_FN = 0x79;
+constexpr u8 OUR_TOKEN = 0x88;
 
 #define DB_FN "./data/dht.db"
 
-typedef union nih_u {
-    char raw[NIH_LEN];
-    struct {
+union Nih {
+    u8 raw[NIH_LEN];
+    struct __attribute__((packed)) {
         u8 a;
         u8 b;
         u8 c;
-        char _[7];
+        u8 _[7];
         u8 ctl_byte;
-        char __[5];
+        u8 __[5];
         u32 checksum;
     };
-} nih_t;
+};
 
-STATIC_ASSERT(sizeof(nih_t) == NIH_LEN, "Messed up nih_t layout!");
+bool operator==(const Nih &x, const Nih &y);
+bool operator!=(const Nih &x, const Nih &y);
 
-typedef union peerinfo_u {
+static_assert(sizeof(Nih) == NIH_LEN, "Messed up Nih layout!");
+
+union Peerinfo {
     char packed[PEERINFO_LEN];
     struct __attribute__((packed)) {
         u32 in_addr;
         u16 sin_port;
     };
-} peerinfo_t;
+};
 
-STATIC_ASSERT(sizeof(peerinfo_t) == PEERINFO_LEN,
-              "Messed up peerinfo_t layout!");
+static_assert(sizeof(Peerinfo) == PEERINFO_LEN, "Messed up Peerinfo layout!");
 
 typedef union pnode_u {
     char raw[PNODE_LEN];
     struct __attribute__((packed)) {
-        nih_t nid;
-        peerinfo_t peerinfo;
+        Nih nid;
+        Peerinfo peerinfo;
     };
-} pnode_t;
+} PNode;
 
-STATIC_ASSERT(sizeof(pnode_t) == PNODE_LEN, "Messed up peerinfo_t layout!");
+static_assert(sizeof(PNode) == PNODE_LEN, "Messed up Peerinfo layout!");
 
 #define SET_NIH(dst, src) memcpy((dst), (src), NIH_LEN);
 #define SET_PNODE(dst, src) memcpy((dst), (src), PNODE_LEN);
 
-#endif // DHT_DHT_H
+#define PRINT_MSG(buf, len)                                                    \
+    for (auto ix = 0; ix < len; ix++) {                                        \
+        printf("%c", isprint(buf[ix]) ? buf[ix] : '.');                        \
+    }                                                                          \
+    printf("\n");                                                              \
+    fflush(stdout);
+
+} // namespace cht

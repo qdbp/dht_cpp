@@ -1,9 +1,10 @@
-// vi:ft=c
-#ifndef DHT_STAT_C
-#define DHT_STAT_C
+#pragma once
 
 #include "dht.h"
 #include <time.h>
+
+using namespace cht;
+namespace cht {
 
 #ifndef STAT_CSV_FN
 #define STAT_CSV_FN "./data/stat.csv"
@@ -34,9 +35,13 @@
     X(ctl_n_send_bufs)                                                         \
     X(ctl_n_gpm_bufs)                                                          \
     X(ctl_ping_window)                                                         \
+    /* spam stats */                                                           \
     X(spam_size_ping)                                                          \
+    X(spam_ping_overflow)                                                      \
     X(spam_size_q_gp)                                                          \
+    X(spam_q_gp_overflow)                                                      \
     X(spam_size_rx)                                                            \
+    X(spam_rx_overflow)                                                        \
     /* received message statistics */                                          \
     X(rx_err)                                                                  \
     X(rx_spam)                                                                 \
@@ -52,7 +57,6 @@
     X(rx_r_gp_values)                                                          \
     X(rx_r_pg)                                                                 \
     /* transmitted message statistics */                                       \
-    X(tx_msg_drop_overflow)                                                    \
     X(tx_msg_drop_early_error)                                                 \
     X(tx_msg_drop_late_error)                                                  \
     X(tx_msg_drop_bad_addr)                                                    \
@@ -167,5 +171,4 @@ void st_rollover(void);
 
 extern u64 st_now_ms;
 extern u64 st_old_ms;
-
-#endif // DHT_STAT_C
+} // namespace cht

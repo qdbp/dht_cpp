@@ -8,6 +8,9 @@
 #include <errno.h>
 #include <time.h>
 
+using namespace cht;
+namespace cht {
+
 const char *stat_names[] = {FORSTAT(AS_STR)};
 
 #define WITH_FILE(f, fn, mode)                                                 \
@@ -66,46 +69,46 @@ void st_init() {
 #endif // STAT_CSV
 }
 
-inline void st_inc(stat_t stat) {
+void st_inc(stat_t stat) {
     g_ctr[stat]++;
 }
 
-inline void st_dec(stat_t stat) {
+void st_dec(stat_t stat) {
     g_ctr[stat] = g_ctr[stat] == 0 ? 0 : g_ctr[stat] - 1;
 }
 
-inline void st_set(stat_t stat, u64 val) {
+void st_set(stat_t stat, u64 val) {
     g_ctr[stat] = val;
 }
 
-inline void st_inc_debug(stat_t stat) {
+void st_inc_debug(stat_t stat) {
     g_ctr[stat]++;
     DEBUG("%s -> %lu", stat_names[stat], g_ctr[stat]);
 }
 
-inline void st_add(stat_t stat, u32 val) {
+void st_add(stat_t stat, u32 val) {
     g_ctr[stat] += val;
 }
 
-inline void st_click_dkad(u8 dkad) {
+void st_click_dkad(u8 dkad) {
 #ifdef STAT_AUX
     assert(dkad <= 160);
     g_dkad_ctr[dkad]++;
 #endif
 };
 
-inline void st_click_gp_n_hops(u8 n_hops) {
+void st_click_gp_n_hops(u8 n_hops) {
 #ifdef STAT_AUX
     assert(n_hops < sizeof(g_n_hops_ctr));
     g_n_hops_ctr[n_hops]++;
 #endif
 }
 
-inline u64 st_get(stat_t stat) {
+u64 st_get(stat_t stat) {
     return g_ctr[stat];
 }
 
-inline u64 st_get_old(stat_t stat) {
+u64 st_get_old(stat_t stat) {
     return g_ctr_old[stat];
 }
 
@@ -117,7 +120,9 @@ void st_rollover(void) {
     spam_run_epoch();
 
     ROLLOVER_TIME()
+
     ctl_rollover_hook();
+
     for (int ix = 0; ix < ST__ST_ENUM_END; ix++) {
         g_ctr_old[ix] = g_ctr[ix];
     };
@@ -165,3 +170,4 @@ void st_rollover(void) {
 #endif // STAT_AUX
 #endif // STAT_CSV
 }
+} // namespace cht
