@@ -1,6 +1,5 @@
-#include "gpmap.h"
-#include <assert.h>
-#include <time.h>
+#include "gpmap.hpp"
+#include <cassert>
 
 using namespace cht;
 namespace cht::gpm {
@@ -88,12 +87,10 @@ static inline void find_best_hops(NextHop &next_hop, const bd::KRPC &krpc,
     u8 this_ix;
     u8 next_dkad;
     u8 next_ix;
-    u8 best_dkads[MAX_GP_PNODES] = {0};
     u8 best_ixes[MAX_GP_PNODES] = {0};
 
-    for (u8 ix = 0; ix < MAX_GP_PNODES; ix++) {
-        best_dkads[ix] = 160;
-    }
+    u8 best_dkads[MAX_GP_PNODES];
+    std::fill(std::begin(best_dkads), std::end(best_dkads), 160);
 
     bool displace = false;
 

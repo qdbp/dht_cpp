@@ -2,8 +2,9 @@ CPP = /usr/bin/clang++
 FAST = -march=native -Ofast -flto -finline-functions
 FAST_CALLGRIND = -march=native -Ofast -flto -fno-inline-functions
 DEBUG = $(FAST) -g
-CPPFLAGS = -std=c++17 -Wall -Werror -fno-exceptions
+CPPFLAGS = -std=c++17 -Wall -Werror -fno-exceptions -fno-rtti
 LDFLAGS = -luv
+CALLGFLAGS = --tool=callgrind --dump-instr=yes --collect-jumps=yes --simulate-cache=yes
 
 CFG = \
 	-DLOGLEVEL=LVL_INFO \
@@ -57,7 +58,7 @@ build_callgrind:
 	$(CPP) $(CPPFLAGS) $(FAST_CALLGRIND) $(CFG_PROD) cht/*.cpp $(LDFLAGS) -o dht_callgrind
 
 callgrind: build_callgrind
-	valgrind --tool=callgrind --dump-instr=yes --collect-jumps=yes ./dht_callgrind
+	valgrind $(CALLGFLAGS) ./dht_callgrind
 
 callgrind_prod: build_prod
-	valgrind --tool=callgrind --dump-instr=yes --collect-jumps=yes ./dht
+	valgrind $(CALLGFLAGS) ./dht

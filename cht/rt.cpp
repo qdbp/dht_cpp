@@ -1,12 +1,12 @@
-#include "log.h"
-#include "rt.h"
-#include "stat.h"
-#include "util.h"
+#include "log.hpp"
+#include "rt.hpp"
+#include "stat.hpp"
+#include "util.hpp"
+#include <cerrno>
+#include <cstdio>
 #include <endian.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <netinet/ip.h>
-#include <stdio.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -20,7 +20,7 @@ using namespace cht;
 using bd::KRPC;
 namespace cht::rt {
 
-RT::Nodeinfo *RT::load_rt(void) {
+RT::Nodeinfo *RT::load_rt() {
 
     int fd = open(RT_FN, O_RDWR | O_CREAT);
 
@@ -30,6 +30,7 @@ RT::Nodeinfo *RT::load_rt(void) {
     }
 
     struct stat info = {0};
+
     if (fstat(fd, &info)) {
         ERROR("Could not stat rt file: %s, bailing.", strerror(errno))
         exit(-1);
@@ -44,9 +45,10 @@ RT::Nodeinfo *RT::load_rt(void) {
         }
     }
 
-    void *addr = mmap(NULL, RT_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    void *addr =
+        mmap(nullptr, RT_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
-    if (addr == (void *)-1) {
+    if (addr == MAP_FAILED) {
         ERROR("Failed to mmap rt file: %s.", strerror(errno));
         exit(-1);
     }
@@ -65,29 +67,39 @@ inline RT::Nodeinfo *RT::get_cell(u8 a, u8 b) const {
 }
 
 inline void RT::set_cell(const Nih &nid, const SIN &addr, u8 qual) {
+    set_cell(nid, addr.sin_addr.s_addr, addr.sin_port, qual);
+}
+
+inline void RT::set_cell(const Nih &nid, u32 in_addr, u16 sin_port, u8 qual) {
 
     Nodeinfo &cell = *get_cell(nid);
 
-    cell.pnode.nid = nid;
+    cell.nih_l = nid.rt.low;
     // These are all in network byte order
-    cell.pnode.peerinfo.sin_port = addr.sin_port;
-    cell.pnode.peerinfo.in_addr = addr.sin_addr.s_addr;
-    cell.quality = CLIP_Q(qual);
+    cell.peerinfo.sin_port = sin_port;
+    cell.peerinfo.in_addr = in_addr;
+    // TODO
+    // cell.quality = CLIP_Q(qual);
 }
 
 void RT::insert_contact(const KRPC &krpc, const SIN &addr, u8 base_qual) {
+    RT::insert_contact(krpc, addr.sin_addr.s_addr, addr.sin_port, base_qual);
+}
 
-    if (!validate_addr(addr.sin_addr.s_addr, addr.sin_port)) {
+void RT::insert_contact(const KRPC &krpc, u32 in_addr, u16 sin_port,
+                        u8 base_qual) {
+
+    if (!validate_addr(in_addr, sin_port)) {
         st_inc(ST_rt_replace_invalid);
     }
 
-    Nodeinfo &node_spot = *get_cell(*krpc.nid);
+    // Nodeinfo &node_spot = *get_cell(*krpc.nid);
 
-    if (!RT::check_evict(node_spot.quality, base_qual)) {
-        st_inc(ST_rt_replace_reject);
-    }
+    // if (!RT::check_evict(node_spot.quality, base_qual)) {
+    //     st_inc(ST_rt_replace_reject);
+    // }
 
-    set_cell(*krpc.nid, addr, base_qual);
+    set_cell(*krpc.nid, in_addr, sin_port, base_qual);
     st_inc(ST_rt_replace_accept);
 }
 
@@ -101,11 +113,11 @@ void RT::adj_quality(const Nih &nid, i64 delta) {
 
     // the contact we're trying to adjust has been replaced!
     // just do nothing in this case
-    if (cell.pnode.nid != nid) {
+    if (cell.nih_l != nid.rt.low) {
         return;
     }
 
-    cell.quality = CLIP_Q(cell.quality + delta);
+    // cell.quality = CLIP_Q(cell.quality + delta);
 }
 
 void RT::delete_node(const Nih &target) {
@@ -115,12 +127,12 @@ void RT::delete_node(const Nih &target) {
 
     Nodeinfo &cell = *get_cell(target);
     // check the node hasn't been replaced in the interim
-    if (cell.pnode.nid == target) {
-        cell.pnode.nid.checksum = 0;
+    if (cell.nih_l == target.rt.low) {
+        cell.nih_l.checksum = 0;
     }
 }
 
-const PNode &RT::get_neighbor_contact(const Nih &target) const {
+const PNode RT::get_neighbor_contact(const Nih &target) const {
     /*
     Returns a nid from the array of nids `narr` whose first two bytes
     match the target.
@@ -133,10 +145,14 @@ const PNode &RT::get_neighbor_contact(const Nih &target) const {
         return get_random_valid_node();
     }
 
-    return out_cell.pnode;
+    return {
+        .nid.rt.high = target.rt.high,
+        .nid.rt.low = out_cell.nih_l,
+        .peerinfo = out_cell.peerinfo,
+    };
 }
 
-const PNode &RT::get_random_valid_node(void) const {
+const PNode RT::get_random_valid_node() const {
     /*
         Returns a random non-zero, valid node from the current routing
        table.
@@ -145,18 +161,23 @@ const PNode &RT::get_random_valid_node(void) const {
         find no node at all.
         */
 
-    u32 start = randint(0, RT_SIZE);
+    u32 start = u32(randint(0, RT_SIZE));
     u32 end = RT_SIZE;
 
     while (start > 0) {
-        for (int ix = start; ix < end; ix++) {
-            u8 ax = ix >> 8;
+        for (u32 ix = start; ix < end; ix++) {
+            u8 ax = u8(ix >> 8);
             u8 bx = ix & 0xff;
 
             Nodeinfo &out = *get_cell(ax, bx);
 
             if (!out.is_empty()) {
-                return out.pnode;
+                return {
+                    .nid.rt.high.a = ax,
+                    .nid.rt.high.b = bx,
+                    .nid.rt.low = out.nih_l,
+                    .peerinfo = out.peerinfo,
+                };
             }
         }
         end = start;
@@ -165,17 +186,17 @@ const PNode &RT::get_random_valid_node(void) const {
 
     st_inc(ST_err_rt_no_contacts);
     ERROR("Could not find any random valid contact. RT in trouble!")
-    return get_cell(0, 0)->pnode;
+    return {{0}};
 }
 
 bool validate_addr(u32 in_addr, u16 sin_port) {
 
     // in_addr and sin_port are big_endian
-    char *addr_bytes = (char *)&in_addr;
-    unsigned char a = addr_bytes[0];
-    unsigned char b = addr_bytes[1];
-    unsigned char c = addr_bytes[2];
-    unsigned char d = addr_bytes[3];
+    u8 *addr_bytes = reinterpret_cast<u8 *>(&in_addr);
+    u8 a = addr_bytes[0];
+    u8 b = addr_bytes[1];
+    u8 c = addr_bytes[2];
+    u8 d = addr_bytes[3];
 
     if (be16toh(sin_port) <= 1024) {
         return false;

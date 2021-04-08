@@ -1,5 +1,5 @@
-#include "msg.h"
-#include <assert.h>
+#include "msg.hpp"
+#include <cassert>
 #include <uv.h>
 
 #include <charconv>
@@ -22,8 +22,8 @@ static constexpr u8 Q_FN_PROTO[] = {
     'i', 'n', 'd',        '_', 'n', 'o', 'd', 'e', '1', ':', 't',      // 80
     '1', ':', OUR_TOK_FN, '1', ':', 'y', '1', ':', 'q', 'e',           // 90
 };
-static constexpr u32 Q_FN_SID_OFFSET = 12;
-static constexpr u32 Q_FN_TARGET_OFFSET = 43;
+static constexpr i32 Q_FN_SID_OFFSET = 12;
+static constexpr i32 Q_FN_TARGET_OFFSET = 43;
 
 static constexpr u8 Q_GP_PROTO[97] = {
     'd', '1', ':', 'a', 'd', '2', ':', 'i', 'd', '2', '0',        ':', // 12
@@ -37,9 +37,9 @@ static constexpr u8 Q_GP_PROTO[97] = {
     'e', 'r', 's', '1', ':', 't', '3', ':', 0,   0,   OUR_TOK_GP, '1', // 90
     ':', 'y', '1', ':', 'q', 'e',                                      // 96
 };
-static constexpr u32 Q_GP_SID_OFFSET = 12;
-static constexpr u32 Q_GP_IH_OFFSET = 46;
-static constexpr u32 Q_GP_TOK_OFFSET = 86;
+static constexpr i32 Q_GP_SID_OFFSET = 12;
+static constexpr i32 Q_GP_IH_OFFSET = 46;
+static constexpr i32 Q_GP_TOK_OFFSET = 86;
 
 static constexpr u8 Q_PG_PROTO[] = {
     'd', '1', ':', 'a',        'd', '2', ':', 'i', 'd', '2', '0', ':', // 12
@@ -71,17 +71,18 @@ static constexpr u8 R_TOKEN[10] = {
 };
 
 template <size_t N>
-static inline void append(u32 &offset, u8 *dst, const u8 src[N]) {
+static inline void append(i32 &offset, u8 *dst, const u8 src[N]) {
     memcpy(dst + offset, src, N);
     offset += N;
 }
 
-static inline void close_r_with_tok(u32 &offset, u8 *buf,
+static inline void close_r_with_tok(i32 &offset, u8 *buf,
                                     const bd::KReply &krpc) {
     // close inner dict
     buf[offset++] = 'e';
 
-    offset += sprintf((char *)(buf + offset), "1:t%u:", krpc.tok_len);
+    offset +=
+        sprintf(reinterpret_cast<char *>(buf + offset), "1:t%u:", krpc.tok_len);
     // Can't use sprintf because
     // of possible null bytes
     memcpy(buf + offset, krpc.tok, krpc.tok_len);
@@ -98,61 +99,61 @@ static inline void write_sid_raw(u8 *buf) {
 }
 
 static inline void write_sid(u8 *buf, const Nih &nid) {
-    SET_NIH(buf, nid.raw);
+    set_nih(buf, nid.raw._raw);
     write_sid_raw(buf);
 }
 
-u32 q_gp(u8 *buf, const Nih &nid, const Nih &infohash, u16 tok) {
+i32 q_gp(u8 *buf, const Nih &nid, const Nih &infohash, u16 tok) {
 
     memcpy(buf, Q_GP_PROTO, sizeof(Q_GP_PROTO));
 
     write_sid(buf + Q_GP_SID_OFFSET, nid);
-    SET_NIH(buf + Q_GP_IH_OFFSET, infohash.raw);
-    *(u16 *)(buf + Q_GP_TOK_OFFSET) = tok;
+    set_nih(buf + Q_GP_IH_OFFSET, infohash.raw._raw);
+    *reinterpret_cast<u16 *>(buf + Q_GP_TOK_OFFSET) = tok;
 
     return sizeof(Q_GP_PROTO);
 }
 
-u32 q_fn(u8 *buf, const Nih &nid, const Nih &target) {
+i32 q_fn(u8 *buf, const Nih &nid, const Nih &target) {
     memcpy(buf, Q_FN_PROTO, sizeof(Q_FN_PROTO));
 
-    SET_NIH(buf + Q_FN_TARGET_OFFSET, target.raw);
+    set_nih(buf + Q_FN_TARGET_OFFSET, target.raw._raw);
     write_sid(buf + Q_FN_SID_OFFSET, nid);
 
     return sizeof(Q_FN_PROTO);
 }
 
-u32 q_pg(u8 *buf, const Nih &nid) {
+i32 q_pg(u8 *buf, const Nih &nid) {
     memcpy(buf, Q_PG_PROTO, sizeof(Q_PG_PROTO));
     write_sid(buf + Q_PG_SID_OFFSET, nid);
 
     return sizeof(Q_PG_PROTO);
 }
 
-u32 r_fn(u8 *buf, const bd::KReply &krpc, const PNode &pnode) {
+i32 r_fn(u8 *buf, const bd::KReply &krpc, const PNode &pnode) {
 
-    u32 offset = 0;
+    i32 offset = 0;
 
     append<sizeof(R_BASE)>(offset, buf, R_BASE);
     write_sid(buf + offset + R_SID_OFFSET, krpc.nid);
 
     append<sizeof(R_NODES)>(offset, buf, R_NODES);
-    SET_PNODE(buf + offset + R_NODES_OFFSET, pnode.raw)
+    set_pnode(buf + offset + R_NODES_OFFSET, pnode.raw);
 
     close_r_with_tok(offset, buf, krpc);
 
     return offset;
 }
 
-u32 r_gp(u8 *buf, const bd::KReply &krpc, const PNode &payload) {
+i32 r_gp(u8 *buf, const bd::KReply &krpc, const PNode &payload) {
 
-    u32 offset = 0;
+    i32 offset = 0;
 
     append<sizeof(R_BASE)>(offset, buf, R_BASE);
     write_sid(buf + offset + R_SID_OFFSET, krpc.nid);
 
     append<sizeof(R_NODES)>(offset, buf, R_NODES);
-    SET_PNODE(buf + offset + R_NODES_OFFSET, payload.raw);
+    set_pnode(buf + offset + R_NODES_OFFSET, payload.raw);
 
     append<sizeof(R_TOKEN)>(offset, buf, R_TOKEN);
 
@@ -161,9 +162,9 @@ u32 r_gp(u8 *buf, const bd::KReply &krpc, const PNode &payload) {
     return offset;
 }
 
-u32 r_pg(u8 *buf, const bd::KReply &krpc) {
+i32 r_pg(u8 *buf, const bd::KReply &krpc) {
 
-    u32 offset = 0;
+    i32 offset = 0;
 
     append<sizeof(R_BASE)>(offset, buf, R_BASE);
     write_sid(buf + offset + R_SID_OFFSET, krpc.nid);

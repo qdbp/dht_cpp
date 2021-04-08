@@ -1,17 +1,19 @@
-#include "ctl.h"
-#include "dht.h"
-#include "gpmap.h"
-#include "log.h"
-#include "spamfilter.h"
-#include "stat.h"
-#include <assert.h>
-#include <errno.h>
-#include <time.h>
+#include "ctl.hpp"
+#include "dht.hpp"
+#include "gpmap.hpp"
+#include "log.hpp"
+#include "spamfilter.hpp"
+#include "stat.hpp"
+#include <cassert>
+#include <cerrno>
+#include <ctime>
+
+#include <chrono>
+
+namespace chr = std::chrono;
 
 using namespace cht;
 namespace cht {
-
-const char *stat_names[] = {FORSTAT(AS_STR)};
 
 #define WITH_FILE(f, fn, mode)                                                 \
     FILE *f = fopen((fn), (mode));                                             \
@@ -25,16 +27,18 @@ const char *stat_names[] = {FORSTAT(AS_STR)};
         ERROR("%s: %s", (errmsg), strerror(errno));                            \
     }
 
+// const char *stat_names[] = {FORSTAT(AS_STR)};
+
+static chr::time_point<chr::steady_clock> st_time_now;
+static chr::time_point<chr::steady_clock> st_time_old;
+
 static u64 g_ctr[ST__ST_ENUM_END] = {0};
 static u64 g_ctr_old[ST__ST_ENUM_END] = {0};
-u64 st_now_ms = 0;
-u64 st_old_ms = 0;
 
-struct timespec __st_now = {0};
-#define ROLLOVER_TIME()                                                        \
-    clock_gettime(CLOCK_MONOTONIC_COARSE, &__st_now);                          \
-    st_old_ms = st_now_ms;                                                     \
-    st_now_ms = (__st_now.tv_sec * 1000) + (__st_now.tv_nsec / 1000000);
+static inline void rollover_time() {
+    st_time_old = st_time_now;
+    st_time_now = chr::steady_clock::now();
+}
 
 #ifdef STAT_AUX
 static u64 g_dkad_ctr[161] = {0};
@@ -42,7 +46,7 @@ static u64 g_n_hops_ctr[GP_MAX_HOPS + 1] = {0};
 #endif
 
 void st_init() {
-    ROLLOVER_TIME()
+    rollover_time();
 #ifdef STAT_CSV
     WITH_FILE(csv, STAT_CSV_FN, "w") {
 
@@ -112,15 +116,13 @@ u64 st_get_old(stat_t stat) {
     return g_ctr_old[stat];
 }
 
-void st_rollover(void) {
+void st_rollover() {
     static int write_csv = 0;
     static int next_heartbeat = 0;
 
     // TODO move to own uv loop
     spam_run_epoch();
-
-    ROLLOVER_TIME()
-
+    rollover_time();
     ctl_rollover_hook();
 
     for (int ix = 0; ix < ST__ST_ENUM_END; ix++) {

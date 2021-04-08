@@ -1,8 +1,8 @@
-#include "dht.h"
-#include "log.h"
-#include "spamfilter.h"
-#include "stat.h"
-#include "util.h"
+#include "dht.hpp"
+#include "log.hpp"
+#include "spamfilter.hpp"
+#include "stat.hpp"
+#include "util.hpp"
 
 #include <array>
 #include <cassert>

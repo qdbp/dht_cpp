@@ -1,9 +1,9 @@
-#include "util.h"
-#include <assert.h>
-#include <stdbool.h>
-#include <stdlib.h>
+#include "util.hpp"
+#include <cassert>
+#include <cstdlib>
 
 using namespace cht;
+
 namespace cht {
 /// Generates a random integer from [mn, mx)
 u64 randint(u64 mn, u64 mx) {

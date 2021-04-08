@@ -1,13 +1,12 @@
 // vi:ft=cpp
 #pragma once
-#include "dht.h"
-#include "log.h"
-#include "stat.h"
+
+#include "dht.hpp"
+#include "log.hpp"
+#include "stat.hpp"
 #include <cassert>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 
 #include <locale>
 
@@ -32,15 +31,15 @@ namespace cht::bd {
 #define XD_FAIL(code) XD_FAIL_MSG((code), "")
 
 // IKEYS
-const char keyname_ID[] = "id";
-const char keyname_IMPLIED_PORT[] = "implied_port";
-const char keyname_INFO_HASH[] = "info_hash";
-const char keyname_NAME[] = "name";
-const char keyname_NODES[] = "nodes";
-const char keyname_PORT[] = "port";
-const char keyname_TARGET[] = "target";
-const char keyname_TOKEN[] = "token";
-const char keyname_VALUES[] = "values";
+constexpr inline char keyname_ID[] = "id";
+constexpr inline char keyname_IMPLIED_PORT[] = "implied_port";
+constexpr inline char keyname_INFO_HASH[] = "info_hash";
+constexpr inline char keyname_NAME[] = "name";
+constexpr inline char keyname_NODES[] = "nodes";
+constexpr inline char keyname_PORT[] = "port";
+constexpr inline char keyname_TARGET[] = "target";
+constexpr inline char keyname_TOKEN[] = "token";
+constexpr inline char keyname_VALUES[] = "values";
 
 // breakdown:
 // i: id, implied_port, info_hash
@@ -57,18 +56,18 @@ const char keyname_VALUES[] = "values";
 // 9: info_hash
 // 12: implied_port
 
-const char valname_AP[] = "announce_peer";
-const char valname_GP[] = "get_peers";
-const char valname_FN[] = "find_node";
-const char valname_PG[] = "ping";
+constexpr inline char valname_AP[] = "announce_peer";
+constexpr inline char valname_GP[] = "get_peers";
+constexpr inline char valname_FN[] = "find_node";
+constexpr inline char valname_PG[] = "ping";
 
 // BDECODE SIZES
-constexpr u16 MAXLEN = 1024;
-constexpr u16 MAXLEN_AP_NAME = 256;
-constexpr u8 MAXLEN_TOK = 32;
-constexpr u8 MAXLEN_TOKEN = 32;
-constexpr u8 MAX_PEERS = 36;
-constexpr u8 MAX_NODES = 8;
+constexpr inline u16 MAXLEN = 1024;
+constexpr inline u16 MAXLEN_AP_NAME = 256;
+constexpr inline u8 MAXLEN_TOK = 32;
+constexpr inline u8 MAXLEN_TOKEN = 32;
+constexpr inline u8 MAX_PEERS = 36;
+constexpr inline u8 MAX_NODES = 8;
 
 #define MK_BIT_OPERATORS(type)                                                 \
     inline type operator|(const type &x, const type &y) {                      \
@@ -90,7 +89,7 @@ constexpr u8 MAX_NODES = 8;
     }
 
 // bdecode message types
-typedef enum Method {
+enum Method {
     Q_AP = 1u,
     Q_FN = 1u << 1u,
     Q_GP = 1u << 2u,
@@ -104,7 +103,7 @@ typedef enum Method {
     Q_ANY = (Q_AP | Q_FN | Q_GP | Q_PG),
     ANY = R_ANY | Q_ANY,
 
-} bd_meth_t;
+};
 
 MK_BIT_OPERATORS(Method)
 
@@ -136,10 +135,11 @@ MK_BIT_OPERATORS(Key)
 
 class KRPC {
   public:
-    const u8 data[MAXLEN] = {0};
+    std::array<u8, MAXLEN> data;
+    // const u8 data[MAXLEN] = {0};
 
     stat_t status = ST__ST_ENUM_START;
-    Method method = static_cast<Method>(0xff'ff'ff'ff);
+    Method method = ANY;
 
     const Nih *nid = nullptr;
     const Nih *ih = nullptr;
@@ -192,12 +192,13 @@ class KRPC {
     void print();
     void clear() {
         status = ST__ST_ENUM_START;
-        method = static_cast<Method>(0xff'ff'ff'ff);
+        method = ANY;
 
         nid = nullptr;
         ih = nullptr;
         target = nullptr;
 
+        // patiently awaiting std::span
         tok_len = 0;
         tok = nullptr;
 

@@ -1,6 +1,6 @@
-#include "ctl.h"
-#include "log.h"
-#include "stat.h"
+#include "ctl.hpp"
+#include "log.hpp"
+#include "stat.hpp"
 
 using namespace cht;
 namespace cht {
@@ -12,7 +12,7 @@ namespace cht {
 
 static u8 ctl_ping_window = 0;
 
-void ctl_init(void) {
+void ctl_init() {
 }
 
 bool ctl_decide_ping(const Nih &nid) {
@@ -20,7 +20,7 @@ bool ctl_decide_ping(const Nih &nid) {
     // return (nid.ctl_byte & 0xf0) == (ctl_ping_window & 0xf0);
 }
 
-void ctl_rollover_hook(void) {
+void ctl_rollover_hook() {
     ctl_ping_window++;
 }
 } // namespace cht

@@ -1,24 +1,23 @@
-#include "ctl.h"
-#include "dht.h"
-#include "gpmap.h"
-#include "krpc.h"
-#include "log.h"
-#include "msg.h"
-#include "rt.h"
-#include "spamfilter.h"
-#include "util.h"
+#include "ctl.hpp"
+#include "dht.hpp"
+#include "gpmap.hpp"
+#include "krpc.hpp"
+#include "log.hpp"
+#include "msg.hpp"
+#include "rt.hpp"
+#include "spamfilter.hpp"
+#include "util.hpp"
 
 #include <functional>
 #include <vector>
 
-extern "C" {
-#include "uvincl/uv.h"
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/random.h>
+extern "C" {
+#include <uv.h>
 }
+
+#define ASIO_STANDALONE
+#include <asio.hpp>
 
 #include <locale>
 
@@ -31,7 +30,7 @@ using SIN = struct sockaddr_in;
 namespace cht {
 
 #define CHECK(r, msg)                                                          \
-    if (r < 0) {                                                               \
+    if ((r) < 0) {                                                             \
         fprintf(stderr, "%s: %s\n", msg, uv_strerror(r));                      \
         exit(1);                                                               \
     }
@@ -86,7 +85,7 @@ static void cb_recv_msg(uv_udp_t *handle, ssize_t nread, const uv_buf_t *buf,
 
     KRPC *const &krpc = it->second;
 
-    if (saddr == NULL || nread == 0) {
+    if (saddr == nullptr || nread == 0) {
         goto cb_recv_msg_early_free;
     }
 
@@ -381,7 +380,7 @@ static void handle_msg(const KRPC &krpc, const SIN &saddr) {
     }
 } // namespace cht
 
-void init_subsystems(void) {
+void init_subsystems() {
     VERBOSE("Initializing ctl...")
     ctl_init();
     // VERBOSE("Initializing rt...")

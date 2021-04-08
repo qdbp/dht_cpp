@@ -1,7 +1,8 @@
 // vi:ft=cpp
 #pragma once
-#include <stdio.h>
-#include <time.h>
+#include <cstdio>
+#include <ctime>
+#include <utility>
 
 #define LVL_DEBUG 2
 #define LVL_VERBOSE 5
@@ -22,6 +23,17 @@ extern char __g_log_fmttime[64];
     fprintf(stderr, "%s [%s] %s:%d: " msg "\n", #code, __g_log_fmttime,        \
             __func__, __LINE__, ##__VA_ARGS__);                                \
     fflush(stderr);
+
+template <typename... Args>
+// constexpr inline void do_log(const char *code, const char *msgfmt,
+//                              Args &&... args) {
+//     time(&__g_log_time);
+//     strftime(__g_log_fmttime, 64, "%Y-%m-%d %H:%M:%S",
+//     gmtime(&__g_log_time)); fprintf(stderr, "%s [%s] %s:%d: %s" msgfmt "\n",
+//     code, __g_log_fmttime,
+//             __func__, __LINE__, std::forward<Args>(args)...);
+//     fflush(stderr);
+// }
 
 #if LOGLEVEL <= LVL_DEBUG
 #define DEBUG(msg, ...) DO_LOG(D, msg, ##__VA_ARGS__)

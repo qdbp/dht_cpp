@@ -1,0 +1,112 @@
+2018-10-24 18:40:25,076 INFO     (chromatica.logging) --- Chromatica Log Start ---
+2018-10-24 18:40:25,079 INFO     (chromatica.logging) NVIM v0.3.1, Python 3.7.1, neovim client 0.2.6
+2018-10-24 18:40:25,079 INFO     (chromatica.core) --------- runtime variables ---------
+2018-10-24 18:40:25,080 INFO     (chromatica.core) g:chromatica#_channel_id=8
+2018-10-24 18:40:25,080 INFO     (chromatica.core) g:chromatica#enable_profiling=0
+2018-10-24 18:40:25,080 INFO     (chromatica.core) g:chromatica#highlight_feature_level=1
+2018-10-24 18:40:25,080 INFO     (chromatica.core) g:chromatica#delay_ms=80
+2018-10-24 18:40:25,080 INFO     (chromatica.core) g:chromatica#libclang_path=/usr/lib/libclang.so
+2018-10-24 18:40:25,080 INFO     (chromatica.core) g:chromatica#dotclangfile_search_path=
+2018-10-24 18:40:25,080 INFO     (chromatica.core) g:chromatica#responsive_mode=0
+2018-10-24 18:40:25,080 INFO     (chromatica.core) g:chromatica#enable_at_startup=1
+2018-10-24 18:40:25,080 INFO     (chromatica.core) g:chromatica#syntax_src_id=100
+2018-10-24 18:40:25,080 INFO     (chromatica.core) g:chromatica#enable_log=0
+2018-10-24 18:40:25,080 INFO     (chromatica.core) g:chromatica#use_pch=1
+2018-10-24 18:40:25,080 INFO     (chromatica.core) -------------------------------------
+2018-10-24 18:40:25,151 INFO     (chromatica.core) clang version 7.0.0 (tags/RELEASE_700/final)
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Target: x86_64-pc-linux-gnu
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Thread model: posix
+2018-10-24 18:40:25,151 INFO     (chromatica.core) InstalledDir: /usr/bin
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Found candidate GCC installation: /usr/bin/../lib/gcc/x86_64-pc-linux-gnu/7.3.1
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Found candidate GCC installation: /usr/bin/../lib/gcc/x86_64-pc-linux-gnu/8.2.1
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Found candidate GCC installation: /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/7.3.1
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Found candidate GCC installation: /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Found candidate GCC installation: /usr/lib/gcc/x86_64-pc-linux-gnu/7.3.1
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Found candidate GCC installation: /usr/lib/gcc/x86_64-pc-linux-gnu/8.2.1
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Found candidate GCC installation: /usr/lib64/gcc/x86_64-pc-linux-gnu/7.3.1
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Found candidate GCC installation: /usr/lib64/gcc/x86_64-pc-linux-gnu/8.2.1
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Selected GCC installation: /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Candidate multilib: .;@m64
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Candidate multilib: 32;@m32
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Selected multilib: .;@m64
+2018-10-24 18:40:25,151 INFO     (chromatica.core) Found CUDA installation: /opt/cuda, version unknown
+2018-10-24 18:40:25,151 INFO     (chromatica.core)  "/usr/bin/clang-7" -cc1 -triple x86_64-pc-linux-gnu -E -disable-free -disable-llvm-verifier -discard-value-names -main-file-name - -mrelocation-model pic -pic-level 2 -pic-is-pie -mthread-model posix -mdisable-fp-elim -fmath-errno -masm-verbose -mconstructor-aliases -munwind-tables -fuse-init-array -target-cpu x86-64 -dwarf-column-info -debugger-tuning=gdb -v -resource-dir /usr/lib/clang/7.0.0 -I. -I/home/main/.local/include -I/home/main/.local/include -internal-isystem /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1/../../../../include/c++/8.2.1 -internal-isystem /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1/../../../../include/c++/8.2.1/x86_64-pc-linux-gnu -internal-isystem /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1/../../../../include/c++/8.2.1/backward -internal-isystem /usr/local/include -internal-isystem /usr/lib/clang/7.0.0/include -internal-externc-isystem /include -internal-externc-isystem /usr/include -fdeprecated-macro -fdebug-compilation-dir /home/main/programming/projects/cht/cht -ferror-limit 19 -fmessage-length 0 -stack-protector 2 -fobjc-runtime=gcc -fcxx-exceptions -fexceptions -fdiagnostics-show-option -o - -x c++ - -faddrsig
+2018-10-24 18:40:25,151 INFO     (chromatica.core) clang -cc1 version 7.0.0 based upon LLVM 7.0.0 default target x86_64-pc-linux-gnu
+2018-10-24 18:40:25,151 INFO     (chromatica.core) ignoring nonexistent directory "/include"
+2018-10-24 18:40:25,151 INFO     (chromatica.core) ignoring duplicate directory "/home/main/.local/include"
+2018-10-24 18:40:25,151 INFO     (chromatica.core) #include "..." search starts here:
+2018-10-24 18:40:25,151 INFO     (chromatica.core) #include <...> search starts here:
+2018-10-24 18:40:25,151 INFO     (chromatica.core)  .
+2018-10-24 18:40:25,151 INFO     (chromatica.core)  /home/main/.local/include
+2018-10-24 18:40:25,151 INFO     (chromatica.core)  /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1/../../../../include/c++/8.2.1
+2018-10-24 18:40:25,151 INFO     (chromatica.core)  /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1/../../../../include/c++/8.2.1/x86_64-pc-linux-gnu
+2018-10-24 18:40:25,151 INFO     (chromatica.core)  /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1/../../../../include/c++/8.2.1/backward
+2018-10-24 18:40:25,151 INFO     (chromatica.core)  /usr/local/include
+2018-10-24 18:40:25,152 INFO     (chromatica.core)  /usr/lib/clang/7.0.0/include
+2018-10-24 18:40:25,152 INFO     (chromatica.core)  /usr/include
+2018-10-24 18:40:25,152 INFO     (chromatica.core) End of search list.
+2018-10-24 18:40:25,152 INFO     (chromatica.core) # 1 "<stdin>"
+2018-10-24 18:40:25,152 INFO     (chromatica.core) # 1 "<built-in>" 1
+2018-10-24 18:40:25,152 INFO     (chromatica.core) # 1 "<built-in>" 3
+2018-10-24 18:40:25,152 INFO     (chromatica.core) # 394 "<built-in>" 3
+2018-10-24 18:40:25,152 INFO     (chromatica.core) # 1 "<command line>" 1
+2018-10-24 18:40:25,152 INFO     (chromatica.core) # 1 "<built-in>" 2
+2018-10-24 18:40:25,152 INFO     (chromatica.core) # 1 "<stdin>" 2
+2018-10-24 18:40:25,152 INFO     (chromatica.core) 
+2018-10-24 18:40:25,152 INFO     (chromatica.core) -------------------------------------
+2018-10-24 21:21:49,916 INFO     (chromatica.logging) --- Chromatica Log Start ---
+2018-10-24 21:21:49,917 INFO     (chromatica.logging) NVIM v0.3.1, Python 3.7.1, neovim client 0.2.6
+2018-10-24 21:21:49,917 INFO     (chromatica.core) --------- runtime variables ---------
+2018-10-24 21:21:49,917 INFO     (chromatica.core) g:chromatica#_channel_id=8
+2018-10-24 21:21:49,917 INFO     (chromatica.core) g:chromatica#enable_profiling=0
+2018-10-24 21:21:49,918 INFO     (chromatica.core) g:chromatica#highlight_feature_level=1
+2018-10-24 21:21:49,918 INFO     (chromatica.core) g:chromatica#delay_ms=80
+2018-10-24 21:21:49,918 INFO     (chromatica.core) g:chromatica#libclang_path=/usr/lib/libclang.so
+2018-10-24 21:21:49,918 INFO     (chromatica.core) g:chromatica#dotclangfile_search_path=
+2018-10-24 21:21:49,918 INFO     (chromatica.core) g:chromatica#responsive_mode=0
+2018-10-24 21:21:49,918 INFO     (chromatica.core) g:chromatica#enable_at_startup=1
+2018-10-24 21:21:49,918 INFO     (chromatica.core) g:chromatica#syntax_src_id=100
+2018-10-24 21:21:49,918 INFO     (chromatica.core) g:chromatica#enable_log=0
+2018-10-24 21:21:49,918 INFO     (chromatica.core) g:chromatica#use_pch=1
+2018-10-24 21:21:49,918 INFO     (chromatica.core) -------------------------------------
+2018-10-24 21:21:49,981 INFO     (chromatica.core) clang version 7.0.0 (tags/RELEASE_700/final)
+2018-10-24 21:21:49,981 INFO     (chromatica.core) Target: x86_64-pc-linux-gnu
+2018-10-24 21:21:49,981 INFO     (chromatica.core) Thread model: posix
+2018-10-24 21:21:49,981 INFO     (chromatica.core) InstalledDir: /usr/bin
+2018-10-24 21:21:49,981 INFO     (chromatica.core) Found candidate GCC installation: /usr/bin/../lib/gcc/x86_64-pc-linux-gnu/7.3.1
+2018-10-24 21:21:49,981 INFO     (chromatica.core) Found candidate GCC installation: /usr/bin/../lib/gcc/x86_64-pc-linux-gnu/8.2.1
+2018-10-24 21:21:49,981 INFO     (chromatica.core) Found candidate GCC installation: /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/7.3.1
+2018-10-24 21:21:49,981 INFO     (chromatica.core) Found candidate GCC installation: /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1
+2018-10-24 21:21:49,981 INFO     (chromatica.core) Found candidate GCC installation: /usr/lib/gcc/x86_64-pc-linux-gnu/7.3.1
+2018-10-24 21:21:49,985 INFO     (chromatica.core) Found candidate GCC installation: /usr/lib/gcc/x86_64-pc-linux-gnu/8.2.1
+2018-10-24 21:21:49,985 INFO     (chromatica.core) Found candidate GCC installation: /usr/lib64/gcc/x86_64-pc-linux-gnu/7.3.1
+2018-10-24 21:21:49,985 INFO     (chromatica.core) Found candidate GCC installation: /usr/lib64/gcc/x86_64-pc-linux-gnu/8.2.1
+2018-10-24 21:21:49,985 INFO     (chromatica.core) Selected GCC installation: /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1
+2018-10-24 21:21:49,985 INFO     (chromatica.core) Candidate multilib: .;@m64
+2018-10-24 21:21:49,985 INFO     (chromatica.core) Candidate multilib: 32;@m32
+2018-10-24 21:21:49,985 INFO     (chromatica.core) Selected multilib: .;@m64
+2018-10-24 21:21:49,985 INFO     (chromatica.core) Found CUDA installation: /opt/cuda, version unknown
+2018-10-24 21:21:49,985 INFO     (chromatica.core)  "/usr/bin/clang-7" -cc1 -triple x86_64-pc-linux-gnu -E -disable-free -disable-llvm-verifier -discard-value-names -main-file-name - -mrelocation-model pic -pic-level 2 -pic-is-pie -mthread-model posix -mdisable-fp-elim -fmath-errno -masm-verbose -mconstructor-aliases -munwind-tables -fuse-init-array -target-cpu x86-64 -dwarf-column-info -debugger-tuning=gdb -v -resource-dir /usr/lib/clang/7.0.0 -I. -I/home/main/.local/include -I/home/main/.local/include -internal-isystem /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1/../../../../include/c++/8.2.1 -internal-isystem /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1/../../../../include/c++/8.2.1/x86_64-pc-linux-gnu -internal-isystem /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1/../../../../include/c++/8.2.1/backward -internal-isystem /usr/local/include -internal-isystem /usr/lib/clang/7.0.0/include -internal-externc-isystem /include -internal-externc-isystem /usr/include -fdeprecated-macro -fdebug-compilation-dir /home/main/programming/projects/cht/cht -ferror-limit 19 -fmessage-length 0 -stack-protector 2 -fobjc-runtime=gcc -fcxx-exceptions -fexceptions -fdiagnostics-show-option -o - -x c++ - -faddrsig
+2018-10-24 21:21:49,985 INFO     (chromatica.core) clang -cc1 version 7.0.0 based upon LLVM 7.0.0 default target x86_64-pc-linux-gnu
+2018-10-24 21:21:49,985 INFO     (chromatica.core) ignoring nonexistent directory "/include"
+2018-10-24 21:21:49,985 INFO     (chromatica.core) ignoring duplicate directory "/home/main/.local/include"
+2018-10-24 21:21:49,985 INFO     (chromatica.core) #include "..." search starts here:
+2018-10-24 21:21:49,985 INFO     (chromatica.core) #include <...> search starts here:
+2018-10-24 21:21:49,985 INFO     (chromatica.core)  .
+2018-10-24 21:21:49,985 INFO     (chromatica.core)  /home/main/.local/include
+2018-10-24 21:21:49,985 INFO     (chromatica.core)  /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1/../../../../include/c++/8.2.1
+2018-10-24 21:21:49,985 INFO     (chromatica.core)  /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1/../../../../include/c++/8.2.1/x86_64-pc-linux-gnu
+2018-10-24 21:21:49,985 INFO     (chromatica.core)  /usr/bin/../lib64/gcc/x86_64-pc-linux-gnu/8.2.1/../../../../include/c++/8.2.1/backward
+2018-10-24 21:21:49,985 INFO     (chromatica.core)  /usr/local/include
+2018-10-24 21:21:49,985 INFO     (chromatica.core)  /usr/lib/clang/7.0.0/include
+2018-10-24 21:21:49,985 INFO     (chromatica.core)  /usr/include
+2018-10-24 21:21:49,985 INFO     (chromatica.core) End of search list.
+2018-10-24 21:21:49,985 INFO     (chromatica.core) # 1 "<stdin>"
+2018-10-24 21:21:49,985 INFO     (chromatica.core) # 1 "<built-in>" 1
+2018-10-24 21:21:49,985 INFO     (chromatica.core) # 1 "<built-in>" 3
+2018-10-24 21:21:49,985 INFO     (chromatica.core) # 394 "<built-in>" 3
+2018-10-24 21:21:49,985 INFO     (chromatica.core) # 1 "<command line>" 1
+2018-10-24 21:21:49,985 INFO     (chromatica.core) # 1 "<built-in>" 2
+2018-10-24 21:21:49,985 INFO     (chromatica.core) # 1 "<stdin>" 2
+2018-10-24 21:21:49,985 INFO     (chromatica.core) 
+2018-10-24 21:21:49,985 INFO     (chromatica.core) -------------------------------------

@@ -1,14 +1,14 @@
 // vi:ft=cpp
 #pragma once
-#include "dht.h"
-#include "krpc.h"
-#include "util.h"
+#include "dht.hpp"
+#include "krpc.hpp"
+#include "util.hpp"
 #include <netinet/ip.h>
-#include <stdbool.h>
 
 using namespace cht;
 using bd::KRPC;
 using SIN = struct sockaddr_in;
+
 namespace cht::rt {
 
 /// If this is set, the routing table is half a GiB, which is very
@@ -33,27 +33,28 @@ namespace cht::rt {
         .sin_addr.s_addr = *(u32 *)((pnode_ptr) + NIH_LEN)                     \
     }
 
-void init(void);
+void init();
 
 bool validate_addr(u32, u16);
 
 class RT {
   private:
     struct Nodeinfo {
-        alignas(32) PNode pnode; // 26
-        u8 quality : RT_Q_WIDTH; // 27
-                                 // 5 bytes FREE
+        Nih_l nih_l;
+        Peerinfo peerinfo;
+
       public:
-        bool is_empty(void) {
-            return pnode.nid.checksum == 0;
+        bool is_empty() {
+            return nih_l.checksum == 0;
         }
     };
-    static_assert(sizeof(Nodeinfo) == 32, "Bad nodeinfo size");
+    static_assert(sizeof(Nodeinfo) == 24, "Bad nodeinfo size");
 
     Nodeinfo *__rt;
     static constexpr u32 RT_SIZE = sizeof(Nodeinfo) * 256 * 256;
 
-    RT() : __rt(load_rt()){};
+    RT() : __rt(load_rt()) {
+    }
 
     static inline bool check_evict(u8 cur_qual, u8 cand_qual) {
         /*
@@ -71,22 +72,23 @@ class RT {
         return randint(0, 1 << (cur_qual - cand_qual)) == 0;
     }
 
-    Nodeinfo *load_rt(void);
+    Nodeinfo *load_rt();
     Nodeinfo *get_cell(const Nih &nid) const;
     Nodeinfo *get_cell(u8 a, u8 b) const;
     void set_cell(const Nih &nid, const SIN &addr, u8 qual);
+    void set_cell(const Nih &nid, u32 in_addr, u16 sin_port, u8 qual);
 
   public:
-    static constexpr RT::Nodeinfo bootstrap_node = {
-        .pnode.nid = {.raw =
-                          {
-                              '2',  0xf5, 'N', 'i',  's',  'Q',  0xff,
-                              'J',  0xec, ')', 0xcd, 0xba, 0xab, 0xf2,
-                              0xfb, 0xe3, 'F', '|',  0xc2, 'g',
-                          }},
-        .pnode.peerinfo.in_addr = 183949123,
+    static constexpr PNode bootstrap_node = {
+        .nid = {.raw =
+                    {
+                        '2',  0xf5, 'N', 'i',  's',  'Q',  0xff,
+                        'J',  0xec, ')', 0xcd, 0xba, 0xab, 0xf2,
+                        0xfb, 0xe3, 'F', '|',  0xc2, 'g',
+                    }},
+        .peerinfo.in_addr = 183949123,
         // the "reverse" of 6881
-        .pnode.peerinfo.sin_port = 57626,
+        .peerinfo.sin_port = 57626,
     };
 
   public:
@@ -99,11 +101,13 @@ class RT {
     RT &operator=(RT const &) = delete;
 
     void insert_contact(const KRPC &krpc, const SIN &addr, u8 base_qual);
+    void insert_contact(const KRPC &krpc, u32 in_addr, u16 sin_port,
+                        u8 base_qual);
     void adj_quality(const Nih &nid, i64 delta);
     void delete_node(const Nih &target);
 
-    const PNode &get_neighbor_contact(const Nih &target) const;
-    const PNode &get_random_valid_node(void) const;
+    const PNode get_neighbor_contact(const Nih &target) const;
+    const PNode get_random_valid_node() const;
 };
 
 bool validate_addr(u32 in_addr, u16 sin_port);

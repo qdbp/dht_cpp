@@ -1,7 +1,9 @@
 #pragma once
 
-#include "dht.h"
-#include <time.h>
+#include "dht.hpp"
+#include <chrono>
+
+// namespace chr = std::chrono;
 
 using namespace cht;
 namespace cht {
@@ -43,9 +45,9 @@ namespace cht {
     X(spam_size_rx)                                                            \
     X(spam_rx_overflow)                                                        \
     /* received message statistics */                                          \
-    X(rx_err)                                                                  \
     X(rx_spam)                                                                 \
     X(rx_tot)                                                                  \
+    X(rx_err)                                                                  \
     X(rx_q_ap)                                                                 \
     X(rx_q_fn)                                                                 \
     X(rx_q_pg)                                                                 \
@@ -60,9 +62,10 @@ namespace cht {
     X(tx_msg_drop_early_error)                                                 \
     X(tx_msg_drop_late_error)                                                  \
     X(tx_msg_drop_bad_addr)                                                    \
-    X(tx_tot)                                                                  \
     X(tx_ping_drop_spam) /* we don't want to spam either! */                   \
     X(tx_ping_drop_ctl)  /* we don't want to spam either! */                   \
+    X(tx_tot)                                                                  \
+    X(tx_err)                                                                  \
     X(tx_q_fn)                                                                 \
     X(tx_q_pg)                                                                 \
     X(tx_q_gp)                                                                 \
@@ -71,14 +74,6 @@ namespace cht {
     X(tx_r_fn)                                                                 \
     X(tx_r_gp)                                                                 \
     X(tx_r_pg)                                                                 \
-    /* bad messages that pass bdecode but that we reject */                    \
-    X(bm_too_short)                                                            \
-    X(bm_ap_bad_name)                                                          \
-    X(bm_ap_bad_token)                                                         \
-    X(bm_nodes_invalid)                                                        \
-    X(bm_peers_bad)                                                            \
-    X(bm_bullshit_dkad)                                                        \
-    X(bm_evil_source)                                                          \
     /* routing table constant */                                               \
     X(rt_replace_accept)                                                       \
     X(rt_replace_reject)                                                       \
@@ -98,6 +93,7 @@ namespace cht {
     /* A: the message is accepted */                                           \
     X(bd_a_no_error)                                                           \
     /* X: the bdecoding is ill-formed or we can't handle the message at all */ \
+    X(bd_x_msg_too_short)                                                      \
     X(bd_x_msg_too_long)                                                       \
     X(bd_x_bad_eom)                                                            \
     X(bd_x_bad_char)                                                           \
@@ -135,6 +131,13 @@ namespace cht {
     X(bd_z_ping_body)                                                          \
     X(bd_z_error_type)                                                         \
     X(bd_z_negative_int)                                                       \
+    /* bad messages that pass bdecode but that we reject in handle*/           \
+    X(bd_z_ap_bad_name)                                                        \
+    X(bd_z_ap_bad_token)                                                       \
+    X(bd_z_nodes_invalid)                                                      \
+    X(bd_z_peers_bad)                                                          \
+    X(bd_z_bullshit_dkad)                                                      \
+    X(bd_z_evil_source) /* for any blacklisted nodes */                        \
     /* E: there is a programming error */                                      \
     X(err_bd_handle_fallthrough)                                               \
     X(err_bd_empty_r_gp)                                                       \
@@ -149,9 +152,10 @@ namespace cht {
 
 // const unsigned long ST_strlen[] = {FORSTAT(AS_STRLEN)};
 
-typedef enum stat_t { FORSTAT(AS_ENUM) } stat_t;
+enum stat_t { FORSTAT(AS_ENUM) };
 
-extern const char *stat_names[];
+constexpr inline const char *stat_names[] = {FORSTAT(AS_STR)};
+// extern const char *stat_names[];
 
 void st_inc(stat_t);
 void st_dec(stat_t);
@@ -166,9 +170,10 @@ void st_click_gp_n_hops(u8);
 u64 st_get(stat_t);
 u64 st_get_old(stat_t);
 
-void st_init(void);
-void st_rollover(void);
+void st_init();
+void st_rollover();
 
-extern u64 st_now_ms;
-extern u64 st_old_ms;
+std::chrono::time_point<std::chrono::steady_clock> now();
+std::chrono::time_point<std::chrono::steady_clock> old();
+
 } // namespace cht

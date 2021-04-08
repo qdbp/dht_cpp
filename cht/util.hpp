@@ -1,8 +1,7 @@
 #pragma once
 
-#include "dht.h"
-#include "stat.h"
-#include <stdbool.h>
+#include "dht.hpp"
+#include "stat.hpp"
 #include <unordered_set>
 #include <vector>
 

@@ -1,11 +1,11 @@
 #pragma once
 
-#include "ctl.h"
-#include "dht.h"
-#include "krpc.h"
-#include "log.h"
-#include "stat.h"
-#include "util.h"
+#include "ctl.hpp"
+#include "dht.hpp"
+#include "krpc.hpp"
+#include "log.hpp"
+#include "stat.hpp"
+#include "util.hpp"
 
 #include <vector>
 

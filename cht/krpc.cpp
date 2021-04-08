@@ -1,7 +1,8 @@
-#include "dht.h"
-#include "krpc.h"
-#include "log.h"
-#include <assert.h>
+#include "dht.hpp"
+#include "krpc.hpp"
+#include "log.hpp"
+#include <cassert>
+#include <cstddef>
 #include <endian.h>
 
 using namespace cht::bd;
@@ -45,14 +46,13 @@ stat_t KRPC::krpc_bdecode_atoi(u32 &dest, u32 &cur_pos, u32 data_len) {
     dest = 0;
     u8 val;
 
-    while (cur_pos < data_len && dest < (UINT32_MAX >> 4u)) {
+    while (cur_pos < data_len && dest < (UINT32_MAX >> 4)) {
 
         val = data[cur_pos];
         cur_pos++;
 
         switch (val) {
         case '-':
-            // hist->fail = ST_bd_z_negative_int;
             return ST_bd_z_negative_int;
         case '0':
         case '1':
@@ -103,7 +103,7 @@ void KRPC::xdecode(u32 data_len) {
     };
 
     while (cur_pos < data_len) {
-        switch ((int)data[cur_pos]) {
+        switch (i32(data[cur_pos])) {
         case 'd':
             switch (xd_state) {
             case XD_START:
